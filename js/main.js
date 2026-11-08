@@ -24,8 +24,9 @@ import { setupInstall, installState, promptInstall } from './install.js';
 import { initShop, showShop, currentShopTotal } from './shop-ui.js';
 import { initSplit, showSplit, setSplitTotal } from './split-ui.js';
 import { initTime, showTime } from './time-ui.js';
+import { initDate, showDate } from './date-ui.js';
 
-const VERSION = 'ステップ5（2026-11-09）';
+const VERSION = 'ステップ6（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -318,7 +319,7 @@ function equals(button) {
 // ---------------------------------------------------------
 // モード（電卓・お買い物）の切りかえ
 // ---------------------------------------------------------
-const VIEWS = { calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView' };
+const VIEWS = { calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView' };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
 function setMode(mode) {
@@ -342,7 +343,8 @@ function applyMode() {
   if (mode === 'calc') render();
   else if (mode === 'shop') showShop();
   else if (mode === 'split') showSplit();
-  else showTime();
+  else if (mode === 'time') showTime();
+  else showDate();
 }
 
 // ---------------------------------------------------------
@@ -579,6 +581,10 @@ function start() {
     onUseInCalc(value, label) {
       useInCalc(value, label);
     },
+  });
+  initDate({
+    settings: () => settings,
+    active: () => currentMode() === 'date',
   });
   applyMode();
 

@@ -21,6 +21,7 @@
         <button type="button" role="tab" data-mode="shop" aria-selected="false">お買い物</button>
         <button type="button" role="tab" data-mode="split" aria-selected="false">割り勘</button>
         <button type="button" role="tab" data-mode="time" aria-selected="false">時間</button>
+        <button type="button" role="tab" data-mode="date" aria-selected="false">日付</button>
       </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
@@ -344,6 +345,60 @@
         </section>
       </div>
     </div>
+
+    <!-- 日付 -->
+    <div class="view date" id="dateView" hidden>
+      <div class="subtabs" id="dateTabs" role="tablist" aria-label="日付の計算">
+        <button type="button" role="tab" data-tab="count" aria-selected="true">日数</button>
+        <button type="button" role="tab" data-tab="add" aria-selected="false">〇日後</button>
+        <button type="button" role="tab" data-tab="age" aria-selected="false">年齢・和暦</button>
+      </div>
+      <div class="shop-pane">
+        <section class="shop-sum" aria-label="答え">
+          <div class="sum-top">
+            <span class="sum-label" id="dateLabel">日数</span>
+            <span class="sum-count" id="dateCount"></span>
+            <button type="button" class="check-btn" id="btnDateCheck">✓ 検算</button>
+          </div>
+          <div class="sum-total" id="dateMain"></div>
+          <div class="sum-tax" id="dateSub"></div>
+        </section>
+        <ul class="w-rows" id="dateRows" aria-label="くわしく"></ul>
+      </div>
+
+      <section class="entry" id="dateEntry" aria-label="日付の入力">
+        <div class="w-fields d-fields">
+          <button type="button" class="fld" data-dfield="from"><small>始め</small><span class="v"></span><small class="unit"></small></button>
+          <button type="button" class="fld" data-dfield="to"><small>終わり</small><span class="v"></span><small class="unit"></small></button>
+          <button type="button" class="fld" data-dfield="base"><small>日付</small><span class="v"></span><small class="unit"></small></button>
+          <button type="button" class="fld" data-dfield="n"><small>数</small><span class="v"></span><small class="unit"></small></button>
+          <button type="button" class="fld" data-dfield="birth"><small>生年月日</small><span class="v"></span><small class="unit"></small></button>
+          <button type="button" class="fld" data-dfield="at"><small>いつの時点</small><span class="v"></span><small class="unit"></small></button>
+        </div>
+        <div class="entry-opts" id="dateOpts"></div>
+        <p class="entry-hint"><span id="dateHint"></span><b id="dateAmount"></b></p>
+      </section>
+
+      <section class="shop-keys date-keys" id="dateKeys" aria-label="日付のキー">
+        <button type="button" data-k="7" class="k num">7</button>
+        <button type="button" data-k="8" class="k num">8</button>
+        <button type="button" data-k="9" class="k num">9</button>
+        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+        <button type="button" data-k="4" class="k num">4</button>
+        <button type="button" data-k="5" class="k num">5</button>
+        <button type="button" data-k="6" class="k num">6</button>
+        <button type="button" data-k="clear" class="k fn danger" aria-label="この欄を消す">C</button>
+        <button type="button" data-k="1" class="k num">1</button>
+        <button type="button" data-k="2" class="k num">2</button>
+        <button type="button" data-k="3" class="k num">3</button>
+        <button type="button" data-k="/" class="k op">/</button>
+        <button type="button" data-k="0" class="k num">0</button>
+        <button type="button" data-k="today" class="k fn small" aria-label="今日の日付を入れる">今日</button>
+        <button type="button" data-k="era" class="k fn small" aria-label="西暦と和暦を切りかえる">和暦</button>
+        <button type="button" data-k="next" class="k eq" aria-label="次の欄へ">次へ</button>
+      </section>
+      <input type="date" class="date-picker" id="datePicker" min="0001-01-01" max="9999-12-31" tabindex="-1" aria-hidden="true">
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -541,6 +596,14 @@
         <li>時間 × 数、時間 ÷ 数、時間 ÷ 時間（何回分）もできます。時間 ＋ 数 のように単位がそろわない計算はできません。</li>
         <li>＝ を押すと、履歴に種類「時間」で残ります。電卓で使うときは「時間の数」（2時間15分 → 2.25）になります。</li>
         <li><b>時給</b>：時給と、始め・終わり・休憩（または働いた時間）を打つと、給料が出ます。えらべば、深夜・残業の割増も入ります。</li>
+      </ul>
+      <h3>日付</h3>
+      <ul>
+        <li><b>日数</b>：始めと終わりの日付で、間の日数が出ます（始めの日も数えた「〇日間」も）。平日・土日・祝日の数も出ます。</li>
+        <li><b>〇日後</b>：日付から〇日・〇週・〇か月・〇年あと（前）の日付が出ます。1/31 の1か月後のように、ない日になるときは月末（2/28）に合わせます。土日・祝日をとばす（営業日）もできます。</li>
+        <li><b>年齢・和暦</b>：生年月日から満年齢・和暦・干支・次の誕生日まで、が出ます。</li>
+        <li>日付は「2026/11/9」のように「/」で区切って打ちます。「和暦」キーで 令和・平成・昭和 の年でも打てます。空の欄は「今日」です。</li>
+        <li>祝日は 2000〜2099年の分を、祝日の法律のきまりから計算しています（法律が変わると、ずれることがあります）。会社の休みや年末年始は入っていません。</li>
       </ul>
       <p class="hint">履歴やいまの式、お買い物の品物、割り勘・時給の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>

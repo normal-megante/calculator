@@ -933,3 +933,24 @@ button.ghost.mini { min-height: 34px; padding: 0 12px; font-size: 13px; }
   -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
   mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
 }
+
+/* =========================================================
+   日付
+   ========================================================= */
+.d-fields .fld[hidden] { display: none; }
+.d-fields .fld .unit { min-width: 0; }
+.date-keys [data-k="today"], .date-keys [data-k="era"] { font-size: 16px; }
+.date-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  bottom: 0;
+  left: 50%;
+}
+.view.date { position: relative; }
+.w-row.hol span { color: var(--danger); }
+.entry-hint span.ng { color: var(--danger); }
+.w-fields.d-fields { grid-template-columns: minmax(0, 1fr); }
+.d-fields .fld { min-height: 46px; }
