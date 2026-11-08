@@ -223,3 +223,10 @@ export function japaneseReading(x) {
   const sign = N.sign(x) < 0 ? 'マイナス ' : '';
   return { text: sign + parts.join(''), approx, fraction: a.q && a.d !== 1n };
 }
+
+// 金額などの短い表示（1,234 / 168.5 / 割り切れなければ 3,333.333333…）
+export function amountText(x) {
+  const f = compact(x, 10);
+  return f.rounded ? `${f.text}…` : f.text;
+}
+export const yenText = (x) => `${amountText(x)}円`;

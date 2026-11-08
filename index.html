@@ -19,6 +19,7 @@
       <nav class="modes" id="modes" role="tablist" aria-label="モード">
         <button type="button" role="tab" data-mode="calc" aria-selected="true">電卓</button>
         <button type="button" role="tab" data-mode="shop" aria-selected="false">お買い物</button>
+        <button type="button" role="tab" data-mode="split" aria-selected="false">割り勘</button>
       </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
@@ -168,6 +169,70 @@
         <button type="button" data-k="add" class="k eq" id="shopAdd">追加</button>
       </section>
     </div>
+
+    <!-- 割り勘 -->
+    <div class="view split" id="splitView" hidden>
+      <div class="shop-pane" id="splitPane">
+        <section class="shop-sum" aria-label="割り勘の結果">
+          <div class="sum-top">
+            <span class="sum-label">割り勘</span>
+            <span class="sum-count" id="splitCount"></span>
+            <button type="button" class="check-btn" id="btnSplitCheck">✓ 検算</button>
+            <button type="button" class="bar-btn icon" id="btnSplitMore" aria-label="端数の決め方とコピー">⋯</button>
+          </div>
+          <button type="button" class="fld wide" data-sfield="total"><small>払う合計</small><span class="v"></span><small>円</small></button>
+          <div class="split-result" id="splitResult" aria-live="polite"></div>
+          <div class="sum-how" id="splitHow"></div>
+        </section>
+        <div class="split-list" id="splitList">
+          <ol class="split-groups" id="splitGroups" aria-label="人の組"></ol>
+          <ol class="split-parts" id="splitParts" aria-label="一部の人だけで払う物"></ol>
+          <div class="split-adds">
+            <button type="button" class="ghost mini" id="btnAddGroup">＋ 人の組を足す</button>
+            <button type="button" class="ghost mini" id="btnAddPart">＋ 一部の人だけで払う物</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- えらんだ組（または払う物）を直す -->
+      <section class="entry" id="splitEdit" aria-label="えらんだ組を直す">
+        <div class="entry-head">
+          <span class="entry-state" id="splitEditState"></span>
+          <input type="text" id="splitName" class="entry-name" maxlength="20" autocomplete="off" enterkeyhint="done">
+          <button type="button" class="ghost mini danger" id="splitDelete">消す</button>
+        </div>
+        <div class="split-fields" id="splitGroupFields">
+          <button type="button" class="fld" data-sfield="count"><small>人数</small><span class="v"></span><small>人</small></button>
+          <button type="button" class="fld" data-sfield="mult"><small>倍率</small><span class="v"></span><small>倍</small></button>
+          <button type="button" class="fld" data-sfield="plus"><small class="lbl">足す</small><span class="v"></span><small>円</small></button>
+          <button type="button" class="fld" data-sfield="amount"><small>1人</small><span class="v"></span><small>円</small></button>
+        </div>
+        <div class="split-fields one" id="splitPartFields">
+          <button type="button" class="fld" data-sfield="partAmount"><small>金額</small><span class="v"></span><small>円</small></button>
+        </div>
+        <div class="entry-opts" id="splitOpts"></div>
+        <p class="entry-hint"><span id="splitHint"></span><b id="splitAmount"></b></p>
+      </section>
+
+      <section class="shop-keys" id="splitKeys" aria-label="割り勘のキー">
+        <button type="button" data-k="7" class="k num">7</button>
+        <button type="button" data-k="8" class="k num">8</button>
+        <button type="button" data-k="9" class="k num">9</button>
+        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+        <button type="button" data-k="4" class="k num">4</button>
+        <button type="button" data-k="5" class="k num">5</button>
+        <button type="button" data-k="6" class="k num">6</button>
+        <button type="button" data-k="clear" class="k fn danger" aria-label="この欄を消す">C</button>
+        <button type="button" data-k="1" class="k num">1</button>
+        <button type="button" data-k="2" class="k num">2</button>
+        <button type="button" data-k="3" class="k num">3</button>
+        <button type="button" data-k="count" class="k op small" aria-label="人数を打つ">人数</button>
+        <button type="button" data-k="0" class="k num">0</button>
+        <button type="button" data-k="00" class="k num">00</button>
+        <button type="button" data-k="." class="k num">.</button>
+        <button type="button" data-k="next" class="k eq" aria-label="次の欄へ">次へ</button>
+      </section>
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -220,10 +285,11 @@
     <div class="d-sec">
       <h3 id="shopMoreTotal">合計を</h3>
       <div class="d-row">
+        <button type="button" class="ghost" id="shopToSplit">割り勘する</button>
         <button type="button" class="ghost" id="shopToCalc">電卓で使う</button>
         <button type="button" class="ghost" id="shopToHistory">履歴に残す</button>
       </div>
-      <p class="hint">「電卓で使う」は、合計を電卓の式に入れます（人数で割るなど）。履歴には、種類「買い物」で残ります。</p>
+      <p class="hint">「割り勘する」は、合計を割り勘の「払う合計」に入れます。「電卓で使う」は、合計を電卓の式に入れます。履歴には、種類「買い物」で残ります。</p>
     </div>
     <div class="d-sec">
       <h3>1円未満の端数</h3>
@@ -238,6 +304,28 @@
     <div class="d-sec">
       <button type="button" class="ghost danger wide" id="shopClear">品物を全部消す</button>
       <p class="hint">消したあと少しの間は「元に戻す」が出ます。予算は消えません。</p>
+    </div>
+  </dialog>
+
+  <!-- 割り勘：端数の決め方とコピー -->
+  <dialog class="sheet" id="splitMoreDialog" aria-labelledby="splitMoreTitle">
+    <div class="sheet-head">
+      <h2 id="splitMoreTitle">割り勘の端数</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="d-sec">
+      <h3>何円単位で集める？</h3>
+      <div class="chips" id="splitUnitChips" role="radiogroup" aria-label="何円単位"></div>
+    </div>
+    <div class="d-sec">
+      <h3>端数はどうする？</h3>
+      <div class="chips" id="splitHowChips" role="radiogroup" aria-label="端数の決め方"></div>
+      <p class="hint">「切り上げ」は少し多めに集めて余りが出ます。「切り捨て」は足りない分が出ます。「幹事がぴったりに合わせる」は、ほかの人は単位で四捨五入して、幹事1人が合計ぴったりになるように払います（幹事は、組をえらんで「幹事」を押して決めます）。</p>
+    </div>
+    <div class="d-sec">
+      <button type="button" class="ghost wide" id="splitCopy">結果をコピー（LINE などに貼れます）</button>
+      <button type="button" class="ghost danger wide" id="splitClear">全部消して、はじめから</button>
+      <p class="hint">消したあと少しの間は「元に戻す」が出ます。</p>
     </div>
   </dialog>
 
@@ -299,7 +387,14 @@
         <li><b>税込・税抜</b>：値段を1つ打つと、10% と 8% の税込・税抜がすぐ出ます。</li>
         <li>消費税は、レシートと同じく「税率ごとにまとめて」計算し、1円未満は切り捨てます（⋯ から変えられます）。</li>
       </ul>
-      <p class="hint">履歴やいまの式、お買い物の品物は、このスマホの中（ブラウザ）にだけ保存されます。</p>
+      <h3>割り勘</h3>
+      <ul>
+        <li>払う合計と人数を打つと、1人あたりが出ます。</li>
+        <li>「人の組を足す」で、組ごとに「〇倍」「〇円足す・引く」「1人〇円だけ（金額指定）」にできます。</li>
+        <li>「一部の人だけで払う物」で、お酒などを、えらんだ人だけで等分できます。</li>
+        <li>端数は、何円単位で、切り上げ・切り捨て・幹事が合わせる、からえらべます（⋯）。</li>
+      </ul>
+      <p class="hint">履歴やいまの式、お買い物の品物、割り勘の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>
     </div>
   </dialog>

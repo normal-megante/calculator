@@ -21,9 +21,10 @@ import { openDetail } from './detail.js';
 import { liveCompare, fullCompare } from './check.js';
 import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
-import { initShop, showShop } from './shop-ui.js';
+import { initShop, showShop, currentShopTotal } from './shop-ui.js';
+import { initSplit, showSplit, setSplitTotal } from './split-ui.js';
 
-const VERSION = 'ステップ3（2026-11-09）';
+const VERSION = 'ステップ4（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -316,8 +317,8 @@ function equals(button) {
 // ---------------------------------------------------------
 // モード（電卓・お買い物）の切りかえ
 // ---------------------------------------------------------
-const MODES = ['calc', 'shop'];
-const currentMode = () => (MODES.includes(settings.mode) ? settings.mode : 'calc');
+const VIEWS = { calc: '#calcView', shop: '#shopView', split: '#splitView' };
+const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
 function setMode(mode) {
   if (mode !== currentMode()) {
@@ -329,13 +330,13 @@ function setMode(mode) {
 
 function applyMode() {
   const mode = currentMode();
-  $('#calcView').hidden = mode !== 'calc';
-  $('#shopView').hidden = mode !== 'shop';
+  for (const [name, selector] of Object.entries(VIEWS)) $(selector).hidden = name !== mode;
   for (const b of document.querySelectorAll('#modes [data-mode]')) {
     b.setAttribute('aria-selected', String(b.dataset.mode === mode));
   }
   if (mode === 'calc') render();
-  else showShop();
+  else if (mode === 'shop') showShop();
+  else showSplit();
 }
 
 // ---------------------------------------------------------
@@ -538,6 +539,19 @@ function start() {
     onSaveHistory(items, value, meta) {
       addHistory(items, value, meta);
     },
+    // お買い物の「割り勘する」：合計を割り勘の「払う合計」に入れる
+    onSplit(value) {
+      if (setSplitTotal(value)) {
+        setMode('split');
+        toast('お買い物の合計を、割り勘の「払う合計」に入れました');
+      }
+    },
+  });
+  initSplit({
+    settings: () => settings,
+    active: () => currentMode() === 'split',
+    calcAnswer: () => state.last?.value ?? null,
+    shopTotal: currentShopTotal,
   });
   applyMode();
 

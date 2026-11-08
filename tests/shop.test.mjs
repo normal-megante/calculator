@@ -3,7 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as N from '../js/num.js';
-import { toYen, lineOf, totalsOf, taxOf, amountOf, sumTerms, compareReceipt, typeKey, tidy } from '../js/shop.js';
+import { toYen, lineOf, totalsOf, taxOf, amountOf, sumTerms, compareReceipt } from '../js/shop.js';
+import { typeKey, tidy } from '../js/form.js';
 
 const yen = (x) => {
   assert.equal(x.q, true);
@@ -126,7 +127,7 @@ test('税込・税抜のかんたん計算', () => {
   assert.equal(yen(taxOf(p, 0, true).tax), 0);
 });
 
-test('数字キーで欄を打つ', () => {
+test('数字キーで欄を打つ（js/form.js）', () => {
   assert.equal(typeKey('', '1'), '1');
   assert.equal(typeKey('0', '5'), '5');
   assert.equal(typeKey('19', '8'), '198');
@@ -143,6 +144,7 @@ test('数字キーで欄を打つ', () => {
   assert.equal(typeKey('198', '2', { fresh: true }), '2');
   assert.equal(typeKey('198', 'back', { fresh: true }), '19');
   assert.equal(typeKey('9'.repeat(12), '9'), null);
+  assert.equal(typeKey('99', '9', { maxInt: 2 }), null);
   assert.equal(tidy('12.'), '12');
   assert.equal(tidy(''), '');
 });

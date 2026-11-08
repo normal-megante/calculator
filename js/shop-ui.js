@@ -11,7 +11,8 @@
 import * as N from './num.js';
 import * as F from './format.js';
 import * as S from './shop.js';
-import { $, toast, buzz } from './ui.js';
+import { $, toast } from './ui.js';
+import { typeKey, tidy, el, button, shake, seg as segOf, setField, setupPad } from './form.js';
 
 const STORE_KEY = 'calculator.shop';
 const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
@@ -103,74 +104,18 @@ function load() {
 }
 
 // ---------------------------------------------------------
-// 小さな道具
+// 小さな道具（部品は form.js）
 // ---------------------------------------------------------
-function el(tag, className, text) {
-  const e = document.createElement(tag);
-  if (className) e.className = className;
-  if (text !== undefined) e.textContent = text;
-  return e;
-}
-
-function button(className, text, onClick) {
-  const b = el('button', className, text);
-  b.type = 'button';
-  if (onClick) b.addEventListener('click', onClick);
-  return b;
-}
-
-// 数の表示（1,234 / 168.5 / 割り切れなければ 90.90909090…）
-function num(x) {
-  const f = F.compact(x, 10);
-  return f.rounded ? `${f.text}…` : f.text;
-}
-const yen = (x) => `${num(x)}円`;
+const num = F.amountText;
+const yen = F.yenText;
 
 // 丸める前と後（同じなら1つだけ）
 function rounded(raw, amount) {
   return N.cmp(raw, amount) === 0 ? num(amount) : `${num(raw)} → ${num(amount)}`;
 }
 
-function reject(target) {
-  buzz(hooks.settings(), [12, 40, 12]);
-  if (!target) return;
-  target.classList.remove('nope');
-  void target.offsetWidth; // アニメーションをやり直す
-  target.classList.add('nope');
-}
-
-// えらぶボタンの組（1つだけえらべる）
-function seg(options, current, onPick, ariaLabel) {
-  const g = el('div', 'seg');
-  g.setAttribute('role', 'radiogroup');
-  g.setAttribute('aria-label', ariaLabel);
-  for (const [value, text] of options) {
-    const b = button('', text, () => {
-      buzz(hooks.settings());
-      onPick(value);
-    });
-    b.setAttribute('role', 'radio');
-    b.setAttribute('aria-checked', String(value === current));
-    g.append(b);
-  }
-  return g;
-}
-
-// 入力欄（ボタンの形）の見た目
-function setField(fieldButton, { text, placeholder, active, fresh = false, shown = null, unit = null }) {
-  const v = fieldButton.querySelector('.v');
-  v.textContent = shown ?? (text ? F.groupNumberText(text) : placeholder);
-  v.classList.toggle('blank', !text);
-  // 長い数は、欄に入るように小さく
-  const length = v.textContent.length;
-  const wide = fieldButton.classList.contains('big') ? 4 : 0;
-  v.classList.toggle('long', length > 9 + wide && length <= 13 + wide);
-  v.classList.toggle('longer', length > 13 + wide);
-  if (unit !== null) fieldButton.querySelector('.unit').textContent = unit;
-  fieldButton.classList.toggle('active', active);
-  fieldButton.classList.toggle('fresh', active && fresh && !!text);
-  fieldButton.setAttribute('aria-pressed', String(active));
-}
+const reject = (target) => shake(target, hooks.settings());
+const seg = (options, current, onPick, ariaLabel) => segOf(options, current, onPick, ariaLabel, hooks.settings());
 
 // ---------------------------------------------------------
 // 表示
@@ -367,7 +312,7 @@ function renderQuick() {
   const hasDisc = !N.isZero(S.amountOf(q.disc));
   if (hasDisc) {
     base = S.discounted(price, price, N.ONE, { type: 'pct', value: q.disc }, mode).amount;
-    box.append(el('p', 'q-after', `${S.tidy(q.disc)}%引き：${yen(price)} → ${yen(base)}（${q.incl ? '税込' : '税抜'}）`));
+    box.append(el('p', 'q-after', `${tidy(q.disc)}%引き：${yen(price)} → ${yen(base)}（${q.incl ? '税込' : '税抜'}）`));
   }
   const res = { 10: S.taxOf(base, 10, q.incl, mode), 8: S.taxOf(base, 8, q.incl, mode) };
   const rows = q.incl ? [['税抜', 'body'], ['消費税（ふくまれる）', 'tax']] : [['税込', 'total'], ['消費税', 'tax']];
@@ -416,7 +361,7 @@ function press(key, target) {
   const d = st.draft;
   const f = st.field;
   const current = f === 'budget' ? st.budget : f === 'disc' ? d.disc.value : d[f];
-  const next = S.typeKey(current, key, { fresh: st.fresh, maxDecimals: DECIMALS[f] });
+  const next = typeKey(current, key, { fresh: st.fresh, maxDecimals: DECIMALS[f] });
   if (next === null) return reject(target);
   if (f === 'disc') {
     if (d.disc.type === 'none') d.disc = { type: 'pct', value: '' }; // 数を打ったら「%引き」に
@@ -439,7 +384,7 @@ function pressQuick(key, target) {
   const q = st.quick;
   if (key === 'add' || key === 'qty') return;
   const current = q.field === 'disc' ? q.disc : q.price;
-  const next = S.typeKey(current, key, { fresh: q.fresh, maxDecimals: 2 });
+  const next = typeKey(current, key, { fresh: q.fresh, maxDecimals: 2 });
   if (next === null) return reject(target);
   if (q.field === 'disc') {
     if (next && N.cmp(S.amountOf(next), HUNDRED) > 0) {
@@ -481,17 +426,17 @@ function add(target) {
     toast('値段を打ってから「追加」を押してください');
     return;
   }
-  const qty = S.tidy(d.qty);
+  const qty = tidy(d.qty);
   if (qty && N.isZero(S.amountOf(qty))) {
     reject(target);
     toast('個数が 0 です');
     return;
   }
-  const discValue = S.tidy(d.disc.value);
+  const discValue = tidy(d.disc.value);
   const item = {
     id: 0,
     name: d.name.trim(),
-    price: S.tidy(d.price),
+    price: tidy(d.price),
     qty: qty === '1' ? '' : qty,
     rate: d.rate,
     incl: d.incl,
@@ -599,6 +544,20 @@ function openMore() {
   chips($('#shopModeChips'), S.ROUNDINGS, 'mode');
   chips($('#shopWayChips'), S.WAYS, 'way');
   if (!dialog.open) dialog.showModal();
+}
+
+// いまの合計（品物がなければ null）。割り勘の画面で使う
+export function currentShopTotal() {
+  return st.items.length ? S.totalsOf(st.items, st.opts).total : null;
+}
+
+function splitTotal() {
+  if (!st.items.length) {
+    toast('まだ品物がありません');
+    return;
+  }
+  $('#shopMoreDialog').close();
+  hooks.onSplit(S.totalsOf(st.items, st.opts).total);
 }
 
 function useTotal() {
@@ -852,54 +811,18 @@ export function initShop(h) {
     else startEdit(id);
   });
 
-  // キー（⌫ は長押しで続けて消す）
-  const keys = $('#shopKeys');
-  let timer = null;
-  let repeated = false;
-  const stop = () => clearTimeout(timer);
-  keys.addEventListener('pointerdown', (event) => {
-    const b = event.target.closest('[data-k]');
-    repeated = false;
-    if (!b || b.dataset.k !== 'back') return;
-    stop();
-    timer = setTimeout(function tick() {
-      repeated = true;
-      press('back', null);
-      timer = setTimeout(tick, 70);
-    }, 450);
-  });
-  window.addEventListener('pointerup', stop);
-  window.addEventListener('pointercancel', stop);
-  keys.addEventListener('contextmenu', (event) => event.preventDefault());
-  keys.addEventListener('click', (event) => {
-    const b = event.target.closest('[data-k]');
-    if (!b) return;
-    if (repeated) {
-      repeated = false;
-      return;
-    }
-    buzz(hooks.settings());
-    press(b.dataset.k, b);
-  });
-
-  // PC のキーボードでも打てるように
-  const KEYMAP = {
-    Backspace: 'back', Escape: 'clear', Delete: 'clear', Enter: 'add', '.': '.', '*': 'qty', x: 'qty',
-  };
-  document.addEventListener('keydown', (event) => {
-    if (!hooks.active()) return;
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (document.querySelector('dialog[open]') || !$('#historyPanel').hidden) return;
-    if (event.target.closest?.('input, textarea')) return;
-    const key = /^[0-9]$/.test(event.key) ? event.key : KEYMAP[event.key];
-    if (!key) return;
-    event.preventDefault();
-    press(key, keys.querySelector(`[data-k="${CSS.escape(key)}"]`));
+  // キー（⌫ は長押しで続けて消す。PC のキーボードでも打てる）
+  setupPad($('#shopKeys'), {
+    press,
+    settings: hooks.settings,
+    active: hooks.active,
+    keymap: { Backspace: 'back', Escape: 'clear', Delete: 'clear', Enter: 'add', '.': '.', '*': 'qty', x: 'qty' },
   });
 
   $('#btnShopCheck').addEventListener('click', openShopCheck);
   $('#btnShopMore').addEventListener('click', openMore);
   $('#shopToCalc').addEventListener('click', useTotal);
+  $('#shopToSplit').addEventListener('click', splitTotal);
   $('#shopToHistory').addEventListener('click', saveToHistory);
   $('#shopClear').addEventListener('click', () => {
     $('#shopMoreDialog').close();

@@ -34,37 +34,6 @@ export function amountOf(text) {
   return N.parseDecimal(text);
 }
 
-// 数字キーで、欄の文字（値段・個数など）を1つ変える。打てないときは null
-//   fresh … 欄をえらんだ直後（数字を打つと、前の文字と入れかわる）
-//   maxDecimals … 小数点の下を何桁まで打てるか（0 なら小数点は打てない）
-export const MAX_DIGITS = 12;
-export function typeKey(text, key, { fresh = false, maxDecimals = 3 } = {}) {
-  if (key === 'back') return text ? text.slice(0, -1) : null;
-  if (key === 'clear') return text ? '' : null;
-  if (fresh) text = '';
-  let next;
-  if (key === '.') {
-    if (maxDecimals === 0 || text.includes('.')) return null;
-    next = `${text || '0'}.`;
-  } else if (key === '00') {
-    if (!text || text === '0') return null; // 先頭に 00 は打てない
-    next = `${text}00`;
-  } else if (/^[0-9]$/.test(key)) {
-    next = text === '0' ? key : text + key;
-  } else {
-    return null;
-  }
-  const [int, dec = ''] = next.split('.');
-  if (int.length > MAX_DIGITS || dec.length > maxDecimals) return null;
-  return next;
-}
-
-// 打ちかけの文字を、品物に入れる形に（「12.」→「12」、「0.50」→「0.5」は数としては同じなのでそのまま）
-export function tidy(text) {
-  if (!text) return '';
-  return text.endsWith('.') ? text.slice(0, -1) : text;
-}
-
 // 1円未満を丸めて、整数（円）にする
 export function toYen(x, mode = 'floor') {
   const { d } = x;
