@@ -23,8 +23,9 @@ import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
 import { initShop, showShop, currentShopTotal } from './shop-ui.js';
 import { initSplit, showSplit, setSplitTotal } from './split-ui.js';
+import { initTime, showTime } from './time-ui.js';
 
-const VERSION = 'ステップ4（2026-11-09）';
+const VERSION = 'ステップ5（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -317,7 +318,7 @@ function equals(button) {
 // ---------------------------------------------------------
 // モード（電卓・お買い物）の切りかえ
 // ---------------------------------------------------------
-const VIEWS = { calc: '#calcView', shop: '#shopView', split: '#splitView' };
+const VIEWS = { calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView' };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
 function setMode(mode) {
@@ -332,11 +333,16 @@ function applyMode() {
   const mode = currentMode();
   for (const [name, selector] of Object.entries(VIEWS)) $(selector).hidden = name !== mode;
   for (const b of document.querySelectorAll('#modes [data-mode]')) {
-    b.setAttribute('aria-selected', String(b.dataset.mode === mode));
+    const on = b.dataset.mode === mode;
+    b.setAttribute('aria-selected', String(on));
+    // モードが多くて横にはみ出すときは、えらんだモードが見えるように
+    if (on) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
+  fadeModes();
   if (mode === 'calc') render();
   else if (mode === 'shop') showShop();
-  else showSplit();
+  else if (mode === 'split') showSplit();
+  else showTime();
 }
 
 // ---------------------------------------------------------
@@ -440,12 +446,21 @@ function setupDisplay() {
   // 画面の大きさが変わったら、文字の大きさを合わせ直す
   window.addEventListener('resize', () => {
     if (currentMode() === 'calc') render();
+    fadeModes();
   });
-  // 上の「電卓｜お買い物」
+  // 上の「電卓｜お買い物｜…」
   $('#modes').addEventListener('click', (event) => {
     const b = event.target.closest('[data-mode]');
     if (b) setMode(b.dataset.mode);
   });
+  $('#modes').addEventListener('scroll', fadeModes, { passive: true });
+}
+
+// 上のモードが横にはみ出しているとき、はしをうすくして「横に動かせる」とわかるように
+function fadeModes() {
+  const modes = $('#modes');
+  modes.classList.toggle('fade-l', modes.scrollLeft > 2);
+  modes.classList.toggle('fade-r', modes.scrollLeft + modes.clientWidth < modes.scrollWidth - 2);
 }
 
 function setupMenu() {
@@ -552,6 +567,18 @@ function start() {
     active: () => currentMode() === 'split',
     calcAnswer: () => state.last?.value ?? null,
     shopTotal: currentShopTotal,
+  });
+  initTime({
+    settings: () => settings,
+    active: () => currentMode() === 'time',
+    // 時間の ＝・時給の「履歴に残す」
+    onSaveHistory(items, value, meta) {
+      addHistory(items, value, meta);
+    },
+    // 時間の答え・給料を電卓の式に入れる
+    onUseInCalc(value, label) {
+      useInCalc(value, label);
+    },
   });
   applyMode();
 

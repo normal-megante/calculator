@@ -20,6 +20,7 @@
         <button type="button" role="tab" data-mode="calc" aria-selected="true">電卓</button>
         <button type="button" role="tab" data-mode="shop" aria-selected="false">お買い物</button>
         <button type="button" role="tab" data-mode="split" aria-selected="false">割り勘</button>
+        <button type="button" role="tab" data-mode="time" aria-selected="false">時間</button>
       </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
@@ -233,6 +234,116 @@
         <button type="button" data-k="next" class="k eq" aria-label="次の欄へ">次へ</button>
       </section>
     </div>
+
+    <!-- 時間 -->
+    <div class="view time" id="timeView" hidden>
+      <div class="subtabs" id="timeTabs" role="tablist" aria-label="時間の計算">
+        <button type="button" role="tab" data-tab="calc" aria-selected="true">時間の計算</button>
+        <button type="button" role="tab" data-tab="wage" aria-selected="false">時給</button>
+      </div>
+
+      <!-- 時間の計算（60進法のまま） -->
+      <div class="time-pane" id="timeCalcPane">
+        <section class="display time-display" id="timeDisplay">
+          <div class="expr-wrap" id="timeExprWrap">
+            <div class="expr" id="timeExpr" aria-label="式（タップした所にカーソルを置けます）"></div>
+          </div>
+          <div class="result" id="timeResult" aria-live="polite"></div>
+          <div class="t-forms" id="timeForms"></div>
+          <div class="t-actions" id="timeActions" hidden>
+            <button type="button" class="check-btn" id="btnTimeCheck">✓ 検算</button>
+            <button type="button" class="ghost mini" id="btnTimeToCalc">電卓で使う</button>
+            <button type="button" class="ghost mini" id="btnTimeToWage">時給で使う</button>
+          </div>
+          <div class="notes" id="timeNotes"></div>
+        </section>
+
+        <section class="keypad time-keys" id="timeKeys" aria-label="時間のキー">
+          <button type="button" data-k="clear" class="k fn danger" aria-label="全部消す">AC</button>
+          <button type="button" data-k="(" class="k fn">(</button>
+          <button type="button" data-k=")" class="k fn">)</button>
+          <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+          <button type="button" data-k="÷" class="k op">÷</button>
+
+          <button type="button" data-k="7" class="k num">7</button>
+          <button type="button" data-k="8" class="k num">8</button>
+          <button type="button" data-k="9" class="k num">9</button>
+          <button type="button" data-k="d" class="k unit">日</button>
+          <button type="button" data-k="×" class="k op">×</button>
+
+          <button type="button" data-k="4" class="k num">4</button>
+          <button type="button" data-k="5" class="k num">5</button>
+          <button type="button" data-k="6" class="k num">6</button>
+          <button type="button" data-k="h" class="k unit">時間</button>
+          <button type="button" data-k="−" class="k op">−</button>
+
+          <button type="button" data-k="1" class="k num">1</button>
+          <button type="button" data-k="2" class="k num">2</button>
+          <button type="button" data-k="3" class="k num">3</button>
+          <button type="button" data-k="m" class="k unit">分</button>
+          <button type="button" data-k="+" class="k op">+</button>
+
+          <button type="button" data-k="0" class="k num">0</button>
+          <button type="button" data-k=":" class="k num">:</button>
+          <button type="button" data-k="." class="k num">.</button>
+          <button type="button" data-k="s" class="k unit">秒</button>
+          <button type="button" data-k="=" class="k eq">=</button>
+        </section>
+      </div>
+
+      <!-- 時給 -->
+      <div class="time-pane" id="wagePane" hidden>
+        <div class="shop-pane">
+          <section class="shop-sum" aria-label="給料">
+            <div class="sum-top">
+              <span class="sum-label">給料</span>
+              <span class="sum-count" id="wageCount"></span>
+              <button type="button" class="check-btn" id="btnWageCheck">✓ 検算</button>
+              <button type="button" class="bar-btn icon" id="btnWageMore" aria-label="給料の使い道と計算のしかた">⋯</button>
+            </div>
+            <div class="sum-total" id="wageTotal">0円</div>
+            <div class="sum-tax" id="wageSub"></div>
+          </section>
+          <ul class="w-rows" id="wageRows" aria-label="給料の内訳"></ul>
+        </div>
+
+        <section class="entry" id="wageEntry" aria-label="時給と働いた時間">
+          <div class="w-fields">
+            <button type="button" class="fld" data-wfield="wage"><small>時給</small><span class="v"></span><small>円</small></button>
+            <button type="button" class="fld" data-wfield="days"><small>日数</small><span class="v"></span><small>日</small></button>
+          </div>
+          <div class="split-fields" id="wageClockFields">
+            <button type="button" class="fld" data-wfield="start"><small>始め</small><span class="v"></span></button>
+            <button type="button" class="fld" data-wfield="end"><small>終わり</small><span class="v"></span></button>
+            <button type="button" class="fld" data-wfield="rest"><small>休憩</small><span class="v"></span><small>分</small></button>
+          </div>
+          <div class="split-fields one" id="wageHoursFields">
+            <button type="button" class="fld" data-wfield="hours"><small>働いた時間</small><span class="v"></span><small>時間</small></button>
+          </div>
+          <div class="entry-opts" id="wageOpts"></div>
+          <p class="entry-hint"><span id="wageHint"></span><b id="wageAmount"></b></p>
+        </section>
+
+        <section class="shop-keys" id="wageKeys" aria-label="時給のキー">
+          <button type="button" data-k="7" class="k num">7</button>
+          <button type="button" data-k="8" class="k num">8</button>
+          <button type="button" data-k="9" class="k num">9</button>
+          <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+          <button type="button" data-k="4" class="k num">4</button>
+          <button type="button" data-k="5" class="k num">5</button>
+          <button type="button" data-k="6" class="k num">6</button>
+          <button type="button" data-k="clear" class="k fn danger" aria-label="この欄を消す">C</button>
+          <button type="button" data-k="1" class="k num">1</button>
+          <button type="button" data-k="2" class="k num">2</button>
+          <button type="button" data-k="3" class="k num">3</button>
+          <button type="button" data-k=":" class="k op">:</button>
+          <button type="button" data-k="0" class="k num">0</button>
+          <button type="button" data-k="00" class="k num">00</button>
+          <button type="button" data-k="." class="k num">.</button>
+          <button type="button" data-k="next" class="k eq" aria-label="次の欄へ">次へ</button>
+        </section>
+      </div>
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -329,6 +440,36 @@
     </div>
   </dialog>
 
+  <!-- 時給：給料の使い道と計算のしかた -->
+  <dialog class="sheet" id="wageMoreDialog" aria-labelledby="wageMoreTitle">
+    <div class="sheet-head">
+      <h2 id="wageMoreTitle">時給の計算</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="d-sec">
+      <h3 id="wageMorePay">給料を</h3>
+      <div class="d-row">
+        <button type="button" class="ghost" id="wageToCalc">電卓で使う</button>
+        <button type="button" class="ghost" id="wageToHistory">履歴に残す</button>
+      </div>
+      <p class="hint">「電卓で使う」は、給料を電卓の式に入れます。履歴には、種類「時給」で残ります。</p>
+    </div>
+    <div class="d-sec">
+      <h3>1円未満の端数</h3>
+      <div class="chips" id="wageModeChips" role="radiogroup" aria-label="1円未満の端数"></div>
+      <p class="hint">1日分 × 日数 を出してから、最後に1回だけ丸めます。会社の決まりに合わせてえらんでください。</p>
+    </div>
+    <div class="d-sec">
+      <h3>割増（わりまし）</h3>
+      <p class="hint">「深夜」は 22時〜翌5時に働いた分、「残業」は1日8時間をこえた分を、時給の 25%増し（両方なら 50%増し）で計算します。法律で決まっているいちばん低い率なので、会社によってはもっと高いことがあります。</p>
+      <p class="hint">週40時間をこえた分・休日・月60時間をこえた残業などは見ていません。休憩は、深夜でない時間にとったとして引きます。</p>
+    </div>
+    <div class="d-sec">
+      <button type="button" class="ghost danger wide" id="wageClear">時給の欄を全部消す</button>
+      <p class="hint">消したあと少しの間は「元に戻す」が出ます。</p>
+    </div>
+  </dialog>
+
   <!-- 名前・種類 -->
   <dialog class="sheet" id="nameDialog" aria-labelledby="nameTitle">
     <form method="dialog" id="nameForm">
@@ -394,7 +535,14 @@
         <li>「一部の人だけで払う物」で、お酒などを、えらんだ人だけで等分できます。</li>
         <li>端数は、何円単位で、切り上げ・切り捨て・幹事が合わせる、からえらべます（⋯）。</li>
       </ul>
-      <p class="hint">履歴やいまの式、お買い物の品物、割り勘の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
+      <h3>時間</h3>
+      <ul>
+        <li><b>時間の計算</b>：数を打って「時間」「分」などを押すと、60進法のまま計算します（1時間30分 ＋ 45分 ＝ 2時間15分）。「9:30」のように「:」でも打てます。</li>
+        <li>時間 × 数、時間 ÷ 数、時間 ÷ 時間（何回分）もできます。時間 ＋ 数 のように単位がそろわない計算はできません。</li>
+        <li>＝ を押すと、履歴に種類「時間」で残ります。電卓で使うときは「時間の数」（2時間15分 → 2.25）になります。</li>
+        <li><b>時給</b>：時給と、始め・終わり・休憩（または働いた時間）を打つと、給料が出ます。えらべば、深夜・残業の割増も入ります。</li>
+      </ul>
+      <p class="hint">履歴やいまの式、お買い物の品物、割り勘・時給の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>
     </div>
   </dialog>

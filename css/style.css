@@ -111,7 +111,7 @@ button { font: inherit; color: inherit; }
 .modes button {
   flex: none;
   min-height: 36px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 0;
   border-radius: 18px;
   background: transparent;
@@ -870,4 +870,66 @@ button.ghost.mini { min-height: 34px; padding: 0 12px; font-size: 13px; }
 /* 横に広い画面（PC）では、少し余白を */
 @media (min-height: 900px) {
   .keypad { height: 470px; }
+}
+
+/* =========================================================
+   時間
+   ========================================================= */
+.time-pane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.time-display { min-height: 120px; }
+.time-display .notes { flex: none; }
+.expr .tk.unit, .expr .ghost.unit { font-size: 0.55em; margin: 0 0.1em 0 0.03em; }
+.expr .tk.unit { color: var(--muted); }
+.t-forms {
+  min-height: 1.4em;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.t-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 4px 0 2px; }
+.t-actions[hidden] { display: none; }
+.t-actions .check-btn { min-height: 34px; }
+.time-keys { grid-template-rows: repeat(5, 1fr); height: min(48dvh, 392px); }
+.time-keys .k.eq { grid-column: auto; }
+.k.unit { background: var(--ref-bg); color: var(--ref-text); font-size: 18px; font-weight: 600; }
+
+/* 時給 */
+.w-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 5px;
+  margin-top: 2px;
+}
+.w-rows {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 4px 8px;
+}
+.w-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.w-row span { flex: 1; min-width: 0; color: var(--muted); }
+.w-row b { flex: none; font-variant-numeric: tabular-nums; }
+.w-row.muted { color: var(--muted); border-bottom: 0; font-size: 13px; }
+#wageKeys .k.op { font-size: 26px; }
+.sum-total.muted { color: var(--muted); }
+
+/* 上のモードが横にはみ出しているときの、はしのうすさ（横に動かせる印） */
+.modes.fade-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.modes.fade-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); }
+.modes.fade-l.fade-r {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
 }
