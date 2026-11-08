@@ -78,15 +78,15 @@ export async function initHistory(h) {
   });
 }
 
-// ＝ を押したとき
-export async function addHistory(items, value) {
+// ＝ を押したとき（お買い物の「履歴に残す」では、種類も付けて）
+export async function addHistory(items, value, { name = '', kind = '' } = {}) {
   const entry = {
     id: DB.newId(),
     time: Date.now(),
     items: serializeItems(items),
     value: N.serialize(value),
-    name: '',
-    kind: '',
+    name,
+    kind,
   };
   entries.unshift(entry);
   try {

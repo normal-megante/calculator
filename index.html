@@ -16,7 +16,10 @@
 <body>
   <div class="app" id="app">
     <header class="bar">
-      <h1 class="bar-title">電卓</h1>
+      <nav class="modes" id="modes" role="tablist" aria-label="モード">
+        <button type="button" role="tab" data-mode="calc" aria-selected="true">電卓</button>
+        <button type="button" role="tab" data-mode="shop" aria-selected="false">お買い物</button>
+      </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
         履歴
@@ -24,6 +27,8 @@
       <button type="button" class="bar-btn icon" id="btnMenu" aria-label="メニュー" aria-haspopup="menu" aria-expanded="false">⋮</button>
     </header>
 
+    <!-- 電卓 -->
+    <div class="view" id="calcView">
     <section class="display" id="display">
       <div class="verify-bar" id="verifyBar" hidden>
         <span><b>照合中</b>　1回目の式を見ないで、同じ計算をもう一度打ってください。ちがう所は赤くなります。</span>
@@ -74,6 +79,95 @@
       <button type="button" data-key="right" class="k move" aria-label="カーソルを右へ">▶</button>
       <button type="button" data-key="=" class="k eq">=</button>
     </section>
+    </div>
+
+    <!-- お買い物 -->
+    <div class="view shop" id="shopView" hidden>
+      <div class="subtabs" id="shopTabs" role="tablist" aria-label="お買い物の計算">
+        <button type="button" role="tab" data-tab="list" aria-selected="true">合計を出す</button>
+        <button type="button" role="tab" data-tab="quick" aria-selected="false">税込・税抜</button>
+      </div>
+
+      <!-- 合計を出す -->
+      <div class="shop-pane" id="listPane">
+        <section class="shop-sum" aria-label="合計">
+          <div class="sum-top">
+            <span class="sum-label">合計（税込）</span>
+            <span class="sum-count" id="sumCount"></span>
+            <button type="button" class="check-btn" id="btnShopCheck">✓ 検算</button>
+            <button type="button" class="bar-btn icon" id="btnShopMore" aria-label="合計の使い道と計算のしかた">⋯</button>
+          </div>
+          <div class="sum-total" id="sumTotal">0円</div>
+          <div class="sum-tax" id="sumTax"></div>
+          <div class="sum-budget">
+            <button type="button" class="fld mini" data-field="budget" id="budgetField"><small>予算</small><span class="v"></span><small>円</small></button>
+            <span class="sum-left" id="sumLeft"></span>
+          </div>
+        </section>
+        <ol class="shop-items" id="shopItems" aria-label="品物"></ol>
+        <p class="empty small" id="shopEmpty">下で値段を打って「追加」を押すと、ここに並びます。<br>並んだ品物をタップすると直せます。</p>
+      </div>
+
+      <!-- 税込・税抜 -->
+      <div class="shop-pane quick" id="quickPane" hidden>
+        <div class="q-fields">
+          <button type="button" class="fld big" data-qfield="price"><small>値段</small><span class="v"></span><small>円</small></button>
+          <button type="button" class="fld" data-qfield="disc"><small>割引</small><span class="v"></span><small>%引き</small></button>
+        </div>
+        <div class="q-opts">
+          <span>打った値段は</span>
+          <div class="seg" id="qIncl" role="radiogroup" aria-label="打った値段は">
+            <button type="button" role="radio" data-incl="0">税抜</button>
+            <button type="button" role="radio" data-incl="1">税込</button>
+          </div>
+        </div>
+        <div class="seg q-disc" id="qDisc" role="group" aria-label="割引をえらぶ" hidden>
+          <button type="button" data-disc="">なし</button>
+          <button type="button" data-disc="10">10%</button>
+          <button type="button" data-disc="20">20%</button>
+          <button type="button" data-disc="30">30%</button>
+          <button type="button" data-disc="50">半額</button>
+        </div>
+        <div class="q-result" id="qResult"></div>
+        <div class="q-note" id="qNote"></div>
+      </div>
+
+      <!-- 品物の入力（合計を出す） -->
+      <section class="entry" id="entry" aria-label="品物の入力">
+        <div class="entry-head">
+          <span class="entry-state" id="entryState">新しい品物</span>
+          <input type="text" id="entryName" class="entry-name" maxlength="30" placeholder="品名（なくてもOK）" autocomplete="off" enterkeyhint="done">
+          <button type="button" class="ghost mini" id="entryCancel" hidden>やめる</button>
+        </div>
+        <div class="entry-fields">
+          <button type="button" class="fld" data-field="price"><small>値段</small><span class="v"></span><small>円</small></button>
+          <span class="times">×</span>
+          <button type="button" class="fld" data-field="qty"><small>個数</small><span class="v"></span></button>
+          <button type="button" class="fld" data-field="disc"><small>割引</small><span class="v"></span><small class="unit"></small></button>
+        </div>
+        <div class="entry-opts" id="entryOpts"></div>
+        <p class="entry-hint"><span id="entryHint"></span><b id="entryAmount"></b></p>
+      </section>
+
+      <section class="shop-keys" id="shopKeys" aria-label="お買い物のキー">
+        <button type="button" data-k="7" class="k num">7</button>
+        <button type="button" data-k="8" class="k num">8</button>
+        <button type="button" data-k="9" class="k num">9</button>
+        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+        <button type="button" data-k="4" class="k num">4</button>
+        <button type="button" data-k="5" class="k num">5</button>
+        <button type="button" data-k="6" class="k num">6</button>
+        <button type="button" data-k="clear" class="k fn danger" aria-label="この欄を消す">C</button>
+        <button type="button" data-k="1" class="k num">1</button>
+        <button type="button" data-k="2" class="k num">2</button>
+        <button type="button" data-k="3" class="k num">3</button>
+        <button type="button" data-k="qty" class="k op small" aria-label="個数を打つ">×個数</button>
+        <button type="button" data-k="0" class="k num">0</button>
+        <button type="button" data-k="00" class="k num">00</button>
+        <button type="button" data-k="." class="k num">.</button>
+        <button type="button" data-k="add" class="k eq" id="shopAdd">追加</button>
+      </section>
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -115,6 +209,36 @@
       <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
     </div>
     <div id="checkBody"></div>
+  </dialog>
+
+  <!-- お買い物：合計の使い道と計算のしかた -->
+  <dialog class="sheet" id="shopMoreDialog" aria-labelledby="shopMoreTitle">
+    <div class="sheet-head">
+      <h2 id="shopMoreTitle">お買い物の合計</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="d-sec">
+      <h3 id="shopMoreTotal">合計を</h3>
+      <div class="d-row">
+        <button type="button" class="ghost" id="shopToCalc">電卓で使う</button>
+        <button type="button" class="ghost" id="shopToHistory">履歴に残す</button>
+      </div>
+      <p class="hint">「電卓で使う」は、合計を電卓の式に入れます（人数で割るなど）。履歴には、種類「買い物」で残ります。</p>
+    </div>
+    <div class="d-sec">
+      <h3>1円未満の端数</h3>
+      <div class="chips" id="shopModeChips" role="radiogroup" aria-label="1円未満の端数"></div>
+      <p class="hint">消費税や割引で出た1円未満を、どうするか。多くのお店は「切り捨て」です。</p>
+    </div>
+    <div class="d-sec">
+      <h3>消費税の出し方</h3>
+      <div class="chips" id="shopWayChips" role="radiogroup" aria-label="消費税の出し方"></div>
+      <p class="hint">いまのレシートは「税率ごとにまとめて」（10%の品物の合計・8%の品物の合計に、それぞれ1回だけ税をかける）がふつうです。レシートと合わないときは「✓ 検算」の「レシートとくらべる」で、合う出し方を探せます。</p>
+    </div>
+    <div class="d-sec">
+      <button type="button" class="ghost danger wide" id="shopClear">品物を全部消す</button>
+      <p class="hint">消したあと少しの間は「元に戻す」が出ます。予算は消えません。</p>
+    </div>
   </dialog>
 
   <!-- 名前・種類 -->
@@ -169,7 +293,13 @@
         <li><b>逆算</b>：計算した順番に1つずつ、逆の計算で元の数にもどるかを見せます（1,280×3＝3,840 → 3,840÷3＝1,280 ✓）。</li>
         <li><b>照合</b>：同じ計算をもう一度打つと、1回目とちがう数字・抜けた数字を赤で知らせます。打ちまちがいを見つけるのに使います。</li>
       </ul>
-      <p class="hint">履歴やいまの式は、このスマホの中（ブラウザ）にだけ保存されます。</p>
+      <h3>お買い物</h3>
+      <ul>
+        <li><b>合計を出す</b>：値段・個数・税率（10%／8%）・割引を入れて足していくと、税込の合計が出ます。予算を入れると残りも出ます。</li>
+        <li><b>税込・税抜</b>：値段を1つ打つと、10% と 8% の税込・税抜がすぐ出ます。</li>
+        <li>消費税は、レシートと同じく「税率ごとにまとめて」計算し、1円未満は切り捨てます（⋯ から変えられます）。</li>
+      </ul>
+      <p class="hint">履歴やいまの式、お買い物の品物は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>
     </div>
   </dialog>

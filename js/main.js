@@ -21,8 +21,9 @@ import { openDetail } from './detail.js';
 import { liveCompare, fullCompare } from './check.js';
 import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
+import { initShop, showShop } from './shop-ui.js';
 
-const VERSION = 'ステップ2（2026-11-09）';
+const VERSION = 'ステップ3（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -313,12 +314,38 @@ function equals(button) {
 }
 
 // ---------------------------------------------------------
+// モード（電卓・お買い物）の切りかえ
+// ---------------------------------------------------------
+const MODES = ['calc', 'shop'];
+const currentMode = () => (MODES.includes(settings.mode) ? settings.mode : 'calc');
+
+function setMode(mode) {
+  if (mode !== currentMode()) {
+    settings = { ...settings, mode };
+    saveSettings(settings);
+  }
+  applyMode();
+}
+
+function applyMode() {
+  const mode = currentMode();
+  $('#calcView').hidden = mode !== 'calc';
+  $('#shopView').hidden = mode !== 'shop';
+  for (const b of document.querySelectorAll('#modes [data-mode]')) {
+    b.setAttribute('aria-selected', String(b.dataset.mode === mode));
+  }
+  if (mode === 'calc') render();
+  else showShop();
+}
+
+// ---------------------------------------------------------
 // 検算
 // ---------------------------------------------------------
 
 // 照合をはじめる：式を空にして、もう一度打ってもらう
 function startVerify(first) {
   closeHistory();
+  setMode('calc');
   state.verify = { items: [...first.items], value: first.value };
   startEditing([]);
   render();
@@ -376,6 +403,7 @@ function setupKeypad() {
     '^': '^', '(': '(', ')': ')', '%': '%', '.': '.',
   };
   document.addEventListener('keydown', (event) => {
+    if (currentMode() !== 'calc') return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (document.querySelector('dialog[open]') || !$('#historyPanel').hidden) return;
     if (event.target.closest?.('input, textarea')) return;
@@ -409,7 +437,14 @@ function setupDisplay() {
   });
   $('#btnVerifyStop').addEventListener('click', stopVerify);
   // 画面の大きさが変わったら、文字の大きさを合わせ直す
-  window.addEventListener('resize', () => render());
+  window.addEventListener('resize', () => {
+    if (currentMode() === 'calc') render();
+  });
+  // 上の「電卓｜お買い物」
+  $('#modes').addEventListener('click', (event) => {
+    const b = event.target.closest('[data-mode]');
+    if (b) setMode(b.dataset.mode);
+  });
 }
 
 function setupMenu() {
@@ -461,6 +496,14 @@ function setupMenu() {
   }
 }
 
+// 数を「答え」の部品にして、電卓の式のカーソルのところに入れる（電卓の画面に切りかえる）
+function useInCalc(value, label) {
+  if (state.mode === 'done') startEditing([]);
+  const next = insertRef(state, answerRef(value, label));
+  startEditing(next.items, next.caret);
+  setMode('calc');
+}
+
 function start() {
   loadState();
   setupInstall();
@@ -470,23 +513,33 @@ function start() {
   initHistory({
     // 履歴の「答えを使う」：答えを全部の桁のまま、いまの式のカーソルのところに入れる
     onUseAnswer(value, label) {
-      if (state.mode === 'done') startEditing([]);
-      const next = insertRef(state, answerRef(value, label));
-      startEditing(next.items, next.caret);
-      render();
+      useInCalc(value, label);
     },
     // 履歴の「式を直す」（照合中ならやめる）
     onEditExpression(items) {
       state.verify = null;
       startEditing([...items]);
-      render();
+      setMode('calc');
     },
     // 履歴の「検算」
     onCheck(items, value, name) {
       showCheck(items, value, name);
     },
   });
-  render();
+  initShop({
+    settings: () => settings,
+    active: () => currentMode() === 'shop',
+    // お買い物の「電卓で使う」：合計を電卓の式に入れる
+    onUseTotal(value) {
+      useInCalc(value);
+      toast('合計を電卓の式に入れました');
+    },
+    // お買い物の「履歴に残す」
+    onSaveHistory(items, value, meta) {
+      addHistory(items, value, meta);
+    },
+  });
+  applyMode();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
