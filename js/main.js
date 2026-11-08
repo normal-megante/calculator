@@ -6,20 +6,23 @@
 //   mode 'done' … ＝ を押した直後（答えを大きく出す）
 //     このあと 数字 → 新しい式、＋ − × ÷ など → 答えの続きから計算
 //     ⌫ ◀ ▶ や式のタップ → さっきの式に戻って直せる
+//   verify … 照合中なら、1回目の計算 { items, value }（いま打っている式とくらべる）
 // =========================================================
 import * as N from './num.js';
 import * as F from './format.js';
-import { evaluate, preview, isDigit, openParens } from './calc.js';
+import { evaluate, preview, isDigit, closeParens } from './calc.js';
 import { pressKey, insertRef } from './keys.js';
 import {
   $, renderItems, span, caretFromPoint, serializeItems, deserializeItems,
   toast, loadSettings, saveSettings, buzz, setupDialogClose,
 } from './ui.js';
-import { initHistory, addHistory } from './history.js';
+import { initHistory, addHistory, closeHistory } from './history.js';
 import { openDetail } from './detail.js';
+import { liveCompare, fullCompare } from './check.js';
+import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
 
-const VERSION = 'ステップ1（2026-11-09）';
+const VERSION = 'ステップ2（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -28,6 +31,7 @@ const state = {
   mode: 'edit',
   last: null,   // { items, value, notes } … 最後に ＝ を押した計算
   error: '',    // ＝ を押したけれど計算できなかったときのお知らせ
+  verify: null, // 照合中なら 1回目の計算 { items, value }
 };
 let settings = loadSettings();
 let shownValue = null; // いま答えの欄に出している数（タップでくわしい表示）
@@ -42,6 +46,7 @@ function saveState() {
       caret: state.caret,
       mode: state.mode,
       last: state.last && { items: serializeItems(state.last.items), value: N.serialize(state.last.value) },
+      verify: state.verify && { items: serializeItems(state.verify.items), value: N.serialize(state.verify.value) },
     }));
   } catch {
     // 保存できなくても、いまの計算には困らない
@@ -61,6 +66,10 @@ function loadState() {
       state.last = { items, value: N.deserialize(saved.last.value), notes };
     }
     state.mode = saved.mode === 'done' && state.last ? 'done' : 'edit';
+    if (saved.verify) {
+      state.verify = { items: deserializeItems(saved.verify.items), value: N.deserialize(saved.verify.value) };
+      state.mode = 'edit';
+    }
   } catch {
     // 読めなければ、まっさらから
   }
@@ -116,10 +125,12 @@ function noteLines(notes, rounded) {
   return lines;
 }
 
+// lines の1つ1つは、文字か { text, cls }（色を付けるとき）
 function setNotes(lines) {
-  notesEl.replaceChildren(...lines.map((line) => span('', line)).map((s) => {
+  notesEl.replaceChildren(...lines.map((line) => {
     const p = document.createElement('p');
-    p.append(s);
+    if (typeof line === 'string') p.textContent = line;
+    else { p.textContent = line.text; p.className = line.cls; }
     return p;
   }));
 }
@@ -127,6 +138,8 @@ function setNotes(lines) {
 function render() {
   const done = state.mode === 'done';
   displayEl.classList.toggle('done', done);
+  $('#verifyBar').hidden = !state.verify;
+  $('#btnCheck').hidden = !done;
   shownValue = null;
 
   if (done) {
@@ -137,34 +150,47 @@ function render() {
     shownValue = state.last.value;
     setNotes(noteLines(state.last.notes, form.rounded));
   } else {
+    // 照合中：ここまで1回目と同じか
+    let verifyLine = null;
+    let marks = null;
+    if (state.verify && state.items.length > 0) {
+      const live = liveCompare(state.verify.items, state.items);
+      if (live.ok) {
+        verifyLine = { text: live.complete ? '✓ 1回目と同じです（＝ で確かめる）' : '✓ ここまで1回目と同じです', cls: 'ok' };
+      } else {
+        verifyLine = { text: '✗ 赤い所が1回目とちがいます', cls: 'ng' };
+        marks = live.marks;
+      }
+    }
     if (state.items.length === 0) {
       renderItems(exprEl, [], { tail: null });
       exprEl.prepend(span('placeholder', '0'));
       exprEl.append(span('caret', ''));
     } else {
-      renderItems(exprEl, state.items, { caret: state.caret, ghostParens: true });
+      renderItems(exprEl, state.items, { caret: state.caret, ghostParens: true, marks });
     }
     fitExpression(44, 26);
+    const withVerify = (lines) => (verifyLine ? [verifyLine, ...lines] : lines);
     if (state.error) {
       resultEl.classList.add('error');
       resultEl.style.fontSize = '';
       resultEl.textContent = state.error;
-      setNotes([]);
+      setNotes(withVerify([]));
     } else {
       const p = preview(state.items);
       if (p?.value) {
         const form = fitForms(F.mainForms(p.value), 30, 18);
         shownValue = p.value;
-        setNotes(noteLines(p.notes, form.rounded));
+        setNotes(withVerify(noteLines(p.notes, form.rounded)));
       } else if (p?.error) {
         resultEl.classList.remove('error');
         resultEl.style.fontSize = '18px';
         resultEl.textContent = p.error;
-        setNotes([]);
+        setNotes(withVerify([]));
       } else {
         resultEl.classList.remove('error');
         resultEl.textContent = '';
-        setNotes([]);
+        setNotes(withVerify([]));
       }
     }
     // カーソルが見えるようにスクロール
@@ -255,10 +281,27 @@ function equals(button) {
   try {
     const { value, notes } = evaluate(state.items);
     // 閉じていなかった ( は閉じた形で残す
-    const items = [...state.items, ...Array(openParens(state.items)).fill(')')];
+    const items = closeParens(state.items);
+    const first = state.verify;
     state.last = { items, value, notes };
     state.mode = 'done';
     state.error = '';
+    state.verify = null;
+    if (first) {
+      // 照合：1回目とくらべて結果を出す（1回目と同じなら、履歴には増やさない）
+      const result = fullCompare(first.items, items);
+      if (!result.same) addHistory(items, value);
+      render();
+      openVerifyResult({
+        first,
+        second: { items, value },
+        result,
+        onEditFirst: () => { startEditing([...first.items]); render(); },
+        onEditSecond: () => { startEditing([...items]); render(); },
+        onRetry: () => startVerify(first),
+      });
+      return;
+    }
     addHistory(items, value);
     render();
   } catch (error) {
@@ -267,6 +310,28 @@ function equals(button) {
     reject(button);
     render();
   }
+}
+
+// ---------------------------------------------------------
+// 検算
+// ---------------------------------------------------------
+
+// 照合をはじめる：式を空にして、もう一度打ってもらう
+function startVerify(first) {
+  closeHistory();
+  state.verify = { items: [...first.items], value: first.value };
+  startEditing([]);
+  render();
+  toast('同じ計算を、もう一度打ってください');
+}
+
+function stopVerify() {
+  state.verify = null;
+  render();
+}
+
+function showCheck(items, value, name = '') {
+  openCheck({ items, value, name, onVerify: () => startVerify({ items, value }) });
 }
 
 // ---------------------------------------------------------
@@ -338,6 +403,11 @@ function setupDisplay() {
   resultEl.addEventListener('click', () => {
     if (shownValue) openDetail(shownValue);
   });
+  // ✓ 検算（＝ のあと）
+  $('#btnCheck').addEventListener('click', () => {
+    if (state.mode === 'done') showCheck(state.last.items, state.last.value);
+  });
+  $('#btnVerifyStop').addEventListener('click', stopVerify);
   // 画面の大きさが変わったら、文字の大きさを合わせ直す
   window.addEventListener('resize', () => render());
 }
@@ -405,10 +475,15 @@ function start() {
       startEditing(next.items, next.caret);
       render();
     },
-    // 履歴の「式を直す」
+    // 履歴の「式を直す」（照合中ならやめる）
     onEditExpression(items) {
+      state.verify = null;
       startEditing([...items]);
       render();
+    },
+    // 履歴の「検算」
+    onCheck(items, value, name) {
+      showCheck(items, value, name);
     },
   });
   render();

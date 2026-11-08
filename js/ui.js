@@ -17,7 +17,8 @@ function classOf(t) {
 // 式（部品の並び）を container の中に表示する。
 // caret が数なら、その位置にカーソルを出す。数字には3桁ごとにカンマを入れる。
 // （カンマは見た目だけで、式の部品には入らない）
-export function renderItems(container, items, { caret = null, ghostParens = false, tail = null } = {}) {
+// marks に入っている位置の部品は赤くする（照合でちがった所）。
+export function renderItems(container, items, { caret = null, ghostParens = false, tail = null, marks = null } = {}) {
   const frag = document.createDocumentFragment();
   const sepBefore = new Set();
   for (let i = 0; i < items.length;) {
@@ -44,6 +45,7 @@ export function renderItems(container, items, { caret = null, ghostParens = fals
       el.className = classOf(t);
       el.textContent = t;
     }
+    if (marks?.has(i)) el.classList.add('bad');
     frag.append(el);
   });
   if (caret === items.length) frag.append(span('caret', ''));

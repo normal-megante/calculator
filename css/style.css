@@ -25,6 +25,9 @@
   --chip-on: #16181d;
   --chip-on-text: #ffffff;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --ok: #1a8a3a;
+  --bad-bg: #ffe1de;
+  --verify-bg: #e6f0ff;
   color-scheme: light;
 }
 
@@ -52,6 +55,9 @@
     --chip-on: #eef0f3;
     --chip-on-text: #14161a;
     --shadow: none;
+    --ok: #5fd27f;
+    --bad-bg: #4a1e1b;
+    --verify-bg: #1d2a3d;
     color-scheme: dark;
   }
 }
@@ -193,7 +199,9 @@ button { font: inherit; color: inherit; }
 .display.done .expr { color: var(--muted); }
 .display.done .result { color: var(--text); font-weight: 600; }
 
+.under { display: flex; align-items: flex-start; gap: 8px; min-height: 1.3em; }
 .notes {
+  flex: 1;
   min-height: 1.3em;
   font-size: 12.5px;
   line-height: 1.45;
@@ -201,6 +209,41 @@ button { font: inherit; color: inherit; }
   text-align: right;
 }
 .notes p { margin: 0; }
+.notes .ok { color: var(--ok); font-weight: 600; }
+.notes .ng { color: var(--danger); font-weight: 600; }
+.check-btn {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ok);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ok);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.check-btn[hidden] { display: none; }
+
+/* 照合中のお知らせ（表示のいちばん上） */
+.verify-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: auto;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--verify-bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.verify-bar[hidden] { display: none; }
+.verify-bar button { flex: none; min-height: 34px; padding: 0 12px; font-size: 13px; }
+.expr .tk.bad, .vs-expr .tk.bad {
+  color: var(--danger) !important;
+  background: var(--bad-bg);
+  border-radius: 0.15em;
+}
 
 /* ---- キー ---- */
 .keypad {
@@ -375,6 +418,35 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
 .d-text { font-size: 16px; line-height: 1.5; word-break: break-all; user-select: text; -webkit-user-select: text; }
 .d-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .d-row button { min-height: 36px; font-size: 14px; }
+
+/* 検算の画面 */
+.steps { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 8px; }
+.step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.step .no { grid-row: span 2; font-size: 18px; color: var(--accent); line-height: 1.4; }
+.calc-line { font-size: 16px; line-height: 1.5; word-break: break-all; font-variant-numeric: tabular-nums; }
+.calc-line sup { font-size: 0.6em; }
+.calc-line .from { margin-right: 1px; font-size: 0.8em; color: var(--accent); }
+.rev { font-size: 14px; color: var(--muted); }
+.rev .mark.ok { color: var(--ok); font-weight: 700; }
+.rev .mark.ng { color: var(--danger); font-weight: 700; }
+.summary { margin: 4px 0; font-weight: 700; }
+.summary.ok, .verdict.ok { color: var(--ok); }
+.summary.ng, .verdict.ng { color: var(--danger); }
+.verdict { margin: 4px 0 6px; font-size: 20px; font-weight: 700; }
+.d-text.small { font-size: 14px; }
+.vs-expr { font-size: 20px; line-height: 1.5; text-align: right; word-break: break-all; }
+.vs-expr .tk.op { color: var(--accent); }
+.vs-expr .tk.ref { padding: 0 0.3em; border-radius: 0.3em; background: var(--ref-bg); color: var(--ref-text); font-size: 0.8em; }
+.vs-ans { font-size: 18px; font-weight: 600; text-align: right; }
+.vs-ans sup { font-size: 0.6em; }
+.sheet-expr .tk.ref { padding: 0 0.3em; border-radius: 0.3em; background: var(--ref-bg); color: var(--ref-text); font-size: 0.85em; }
 
 .about h3 { margin: 14px 0 4px; font-size: 15px; }
 .about p, .about li { font-size: 14px; line-height: 1.6; }

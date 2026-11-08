@@ -25,11 +25,18 @@
     </header>
 
     <section class="display" id="display">
+      <div class="verify-bar" id="verifyBar" hidden>
+        <span><b>照合中</b>　1回目の式を見ないで、同じ計算をもう一度打ってください。ちがう所は赤くなります。</span>
+        <button type="button" class="ghost" id="btnVerifyStop">やめる</button>
+      </div>
       <div class="expr-wrap" id="exprWrap">
         <div class="expr" id="expr" aria-label="式（タップした所にカーソルを置けます）"></div>
       </div>
       <button type="button" class="result" id="result" aria-label="答え（タップで全部の桁）"></button>
-      <div class="notes" id="notes" aria-live="polite"></div>
+      <div class="under">
+        <button type="button" class="check-btn" id="btnCheck" hidden>✓ 検算</button>
+        <div class="notes" id="notes" aria-live="polite"></div>
+      </div>
     </section>
 
     <section class="keypad" id="keypad" aria-label="キー">
@@ -101,6 +108,15 @@
     <div id="detailBody"></div>
   </dialog>
 
+  <!-- 検算・照合の結果 -->
+  <dialog class="sheet" id="checkDialog" aria-labelledby="checkTitle">
+    <div class="sheet-head">
+      <h2 id="checkTitle">検算</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div id="checkBody"></div>
+  </dialog>
+
   <!-- 名前・種類 -->
   <dialog class="sheet" id="nameDialog" aria-labelledby="nameTitle">
     <form method="dialog" id="nameForm">
@@ -147,6 +163,12 @@
       </ul>
       <h3>式の途中を直す</h3>
       <p>式をタップすると、そこにカーソルが入ります。◀ ▶ で1つずつ動かせます。⌫ はカーソルの左を消し、数字はカーソルのところに入ります。</p>
+      <h3>検算</h3>
+      <p>＝ のあとの「✓ 検算」（履歴からも使えます）で、2つの方法で確かめられます。</p>
+      <ul>
+        <li><b>逆算</b>：計算した順番に1つずつ、逆の計算で元の数にもどるかを見せます（1,280×3＝3,840 → 3,840÷3＝1,280 ✓）。</li>
+        <li><b>照合</b>：同じ計算をもう一度打つと、1回目とちがう数字・抜けた数字を赤で知らせます。打ちまちがいを見つけるのに使います。</li>
+      </ul>
       <p class="hint">履歴やいまの式は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>
     </div>

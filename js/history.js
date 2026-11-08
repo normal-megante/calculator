@@ -110,9 +110,12 @@ function hidePanel() {
 }
 
 function closePanel() {
+  if ($('#historyPanel').hidden) return;
   if (history.state?.panel === 'history') history.back(); // popstate で閉じる
   else hidePanel();
 }
+
+export { closePanel as closeHistory };
 
 // 種類の一覧（最近使った順）
 function kinds() {
@@ -192,6 +195,7 @@ function itemEl(entry) {
   for (const [act, label, cls] of [
     ['use', '答えを使う'],
     ['edit', '式を直す'],
+    ['check', '✓ 検算'],
     ['name', '名前・種類'],
     ['detail', '全部の桁'],
     ['delete', '消す', 'danger'],
@@ -222,6 +226,10 @@ function onListClick(event) {
     case 'edit':
       handlers.onEditExpression(c.items);
       closePanel();
+      return;
+    case 'check':
+      // 検算の画面は履歴の上に出る（照合をはじめたら、履歴の画面は閉じる：closeHistory）
+      handlers.onCheck(c.items, c.value, entry.name);
       return;
     case 'name':
       openNameDialog(entry);

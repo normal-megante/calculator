@@ -191,13 +191,29 @@ export function parse(tokens) {
 
 // ---------------------------------------------------------
 // 計算の木 → 答え
+//
+// 計算した順番に、1つずつの計算（ステップ）を ctx.steps に記録する（検算で使う）。
+//   { op, a, b, result, aFrom, bFrom }
+//   op    : '+' '−' '×' '÷' '^' '²' '√' '%' 'neg' 'pct+' 'pct−'
+//   aFrom : a が前のステップの答えなら、そのステップの番号（数をそのまま打ったなら null）
 // ---------------------------------------------------------
+function record(ctx, node, step) {
+  ctx.steps.push(step);
+  node.step = ctx.steps.length - 1;
+  return step.result;
+}
+
+const from = (node) => node.step ?? null;
+
 function evaluateNode(node, ctx) {
   switch (node.t) {
     case 'num':
       return node.v;
-    case 'group':
-      return evaluateNode(node.a, ctx);
+    case 'group': {
+      const v = evaluateNode(node.a, ctx);
+      node.step = node.a.step;
+      return v;
+    }
     case 'add': {
       const a = evaluateNode(node.a, ctx);
       if (node.b.t === 'pct') {
@@ -205,26 +221,46 @@ function evaluateNode(node, ctx) {
         const percent = evaluateNode(node.b.a, ctx);
         const part = N.mul(a, N.div(percent, HUNDRED));
         ctx.notes.push({ kind: 'percent', op: node.op, base: a, percent, part });
-        return node.op === '+' ? N.add(a, part) : N.sub(a, part);
+        const result = node.op === '+' ? N.add(a, part) : N.sub(a, part);
+        return record(ctx, node, {
+          op: node.op === '+' ? 'pct+' : 'pct−', a, b: percent, part, result,
+          aFrom: from(node.a), bFrom: from(node.b.a),
+        });
       }
       const b = evaluateNode(node.b, ctx);
-      return node.op === '+' ? N.add(a, b) : N.sub(a, b);
+      const result = node.op === '+' ? N.add(a, b) : N.sub(a, b);
+      return record(ctx, node, { op: node.op, a, b, result, aFrom: from(node.a), bFrom: from(node.b) });
     }
     case 'mul': {
       const a = evaluateNode(node.a, ctx);
       const b = evaluateNode(node.b, ctx);
-      return node.op === '÷' ? N.div(a, b) : N.mul(a, b);
+      const result = node.op === '÷' ? N.div(a, b) : N.mul(a, b);
+      const op = node.op === '÷' ? '÷' : '×';
+      return record(ctx, node, { op, a, b, result, aFrom: from(node.a), bFrom: from(node.b) });
     }
-    case 'neg':
-      return N.neg(evaluateNode(node.a, ctx));
-    case 'pow':
-      return N.pow(evaluateNode(node.a, ctx), evaluateNode(node.b, ctx));
-    case 'sq':
-      return N.pow(evaluateNode(node.a, ctx), N.frac(2n));
-    case 'pct':
-      return N.div(evaluateNode(node.a, ctx), HUNDRED);
-    case 'sqrt':
-      return N.sqrt(evaluateNode(node.a, ctx));
+    case 'neg': {
+      const a = evaluateNode(node.a, ctx);
+      // 「−5」のように数にマイナスを付けただけなら、計算とは数えない
+      if (node.a.t === 'num') return N.neg(a);
+      return record(ctx, node, { op: 'neg', a, result: N.neg(a), aFrom: from(node.a) });
+    }
+    case 'pow': {
+      const a = evaluateNode(node.a, ctx);
+      const b = evaluateNode(node.b, ctx);
+      return record(ctx, node, { op: '^', a, b, result: N.pow(a, b), aFrom: from(node.a), bFrom: from(node.b) });
+    }
+    case 'sq': {
+      const a = evaluateNode(node.a, ctx);
+      return record(ctx, node, { op: '²', a, result: N.pow(a, N.frac(2n)), aFrom: from(node.a) });
+    }
+    case 'pct': {
+      const a = evaluateNode(node.a, ctx);
+      return record(ctx, node, { op: '%', a, result: N.div(a, HUNDRED), aFrom: from(node.a) });
+    }
+    case 'sqrt': {
+      const a = evaluateNode(node.a, ctx);
+      return record(ctx, node, { op: '√', a, result: N.sqrt(a), aFrom: from(node.a) });
+    }
     default:
       throw new Error(`知らない計算: ${node.t}`);
   }
@@ -241,14 +277,19 @@ export function openParens(items, upto = items.length) {
 }
 
 // 式を計算する（＝を押したとき）。閉じていない ( は最後に閉じる。
-// 返す値：{ value, notes }。計算できなければ CalcError を投げる。
+// 返す値：{ value, notes, steps }。計算できなければ CalcError を投げる。
 export function evaluate(items) {
   const tokens = lex(items);
   for (let k = openParens(items); k > 0; k--) tokens.push({ type: 'rp', value: ')', at: items.length });
   const tree = parse(tokens);
-  const ctx = { notes: [] };
+  const ctx = { notes: [], steps: [] };
   const value = evaluateNode(tree, ctx);
-  return { value, notes: ctx.notes };
+  return { value, notes: ctx.notes, steps: ctx.steps };
+}
+
+// 閉じていない ( を閉じた式（＝ のあと、履歴に残す形）
+export function closeParens(items) {
+  return [...items, ...Array(openParens(items)).fill(')')];
 }
 
 // 打っている途中の式の答え（＝を押さなくても出す答え）
@@ -275,7 +316,7 @@ export function preview(items) {
   for (; depth > 0; depth--) tokens.push({ type: 'rp', value: ')' });
   try {
     const tree = parse(tokens);
-    const ctx = { notes: [] };
+    const ctx = { notes: [], steps: [] };
     return { value: evaluateNode(tree, ctx), notes: ctx.notes };
   } catch (error) {
     if (error instanceof CalcError && error.kind === 'math') return { error: error.message };
