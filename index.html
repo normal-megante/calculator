@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f3f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="誤差の出にくい、スマホ向けの電卓">
+  <title>電卓</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="bar">
+      <h1 class="bar-title">電卓</h1>
+      <button type="button" class="bar-btn" id="btnHistory">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
+        履歴
+      </button>
+      <button type="button" class="bar-btn icon" id="btnMenu" aria-label="メニュー" aria-haspopup="menu" aria-expanded="false">⋮</button>
+    </header>
+
+    <section class="display" id="display">
+      <div class="expr-wrap" id="exprWrap">
+        <div class="expr" id="expr" aria-label="式（タップした所にカーソルを置けます）"></div>
+      </div>
+      <button type="button" class="result" id="result" aria-label="答え（タップで全部の桁）"></button>
+      <div class="notes" id="notes" aria-live="polite"></div>
+    </section>
+
+    <section class="keypad" id="keypad" aria-label="キー">
+      <button type="button" data-key="clear" class="k fn danger" aria-label="全部消す">AC</button>
+      <button type="button" data-key="(" class="k fn">(</button>
+      <button type="button" data-key=")" class="k fn">)</button>
+      <button type="button" data-key="%" class="k fn">%</button>
+      <button type="button" data-key="back" class="k fn" aria-label="1文字消す">⌫</button>
+
+      <button type="button" data-key="√" class="k fn">√</button>
+      <button type="button" data-key="7" class="k num">7</button>
+      <button type="button" data-key="8" class="k num">8</button>
+      <button type="button" data-key="9" class="k num">9</button>
+      <button type="button" data-key="÷" class="k op">÷</button>
+
+      <button type="button" data-key="²" class="k fn" aria-label="2乗">x²</button>
+      <button type="button" data-key="4" class="k num">4</button>
+      <button type="button" data-key="5" class="k num">5</button>
+      <button type="button" data-key="6" class="k num">6</button>
+      <button type="button" data-key="×" class="k op">×</button>
+
+      <button type="button" data-key="^" class="k fn" aria-label="累乗">x<sup>y</sup></button>
+      <button type="button" data-key="1" class="k num">1</button>
+      <button type="button" data-key="2" class="k num">2</button>
+      <button type="button" data-key="3" class="k num">3</button>
+      <button type="button" data-key="−" class="k op">−</button>
+
+      <button type="button" data-key="ans" class="k fn small" aria-label="前の答えを入れる">答え</button>
+      <button type="button" data-key="0" class="k num">0</button>
+      <button type="button" data-key="00" class="k num">00</button>
+      <button type="button" data-key="." class="k num">.</button>
+      <button type="button" data-key="+" class="k op">+</button>
+
+      <button type="button" data-key="left" class="k move" aria-label="カーソルを左へ">◀</button>
+      <button type="button" data-key="right" class="k move" aria-label="カーソルを右へ">▶</button>
+      <button type="button" data-key="=" class="k eq">=</button>
+    </section>
+  </div>
+
+  <!-- 履歴 -->
+  <section class="panel" id="historyPanel" hidden aria-label="履歴">
+    <header class="bar">
+      <button type="button" class="bar-btn" id="btnHistoryClose">← 電卓へ</button>
+      <h2 class="bar-title center">履歴</h2>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="panel-body" id="historyBody">
+      <div class="panel-tools">
+        <input type="search" id="historySearch" placeholder="名前・式・答えで探す" enterkeyhint="search">
+        <div class="chips" id="historyKinds" role="group" aria-label="種類でしぼる"></div>
+      </div>
+      <p class="hint">＝ を押した計算が残ります。タップすると「答えを使う」「式を直す」「名前・種類」などが出ます。</p>
+      <ol class="history-list" id="historyList"></ol>
+      <p class="empty" id="historyEmpty" hidden></p>
+      <button type="button" class="ghost wide" id="historyMore" hidden>もっと見る</button>
+      <div class="panel-foot">
+        <button type="button" class="ghost danger wide" id="btnHistoryClean">名前も種類もない履歴をまとめて消す</button>
+        <p class="hint">名前か種類を付けた履歴は消えずに残ります。消したものは元に戻せません。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 答えのくわしい表示 -->
+  <dialog class="sheet" id="detailDialog" aria-labelledby="detailTitle">
+    <div class="sheet-head">
+      <h2 id="detailTitle">答えのくわしい表示</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div id="detailBody"></div>
+  </dialog>
+
+  <!-- 名前・種類 -->
+  <dialog class="sheet" id="nameDialog" aria-labelledby="nameTitle">
+    <form method="dialog" id="nameForm">
+      <div class="sheet-head">
+        <h2 id="nameTitle">名前・種類</h2>
+        <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+      </div>
+      <div class="sheet-expr" id="nameExpr"></div>
+      <label class="field">
+        <span>名前</span>
+        <input type="text" id="nameInput" maxlength="40" placeholder="例：11月の電気代" autocomplete="off">
+      </label>
+      <p class="hint">名前を付けると、ほかの式に「答え」として入れたときにその名前で出ます。</p>
+      <div class="field">
+        <span>種類</span>
+        <div class="chips" id="kindChips" role="radiogroup" aria-label="種類"></div>
+        <input type="text" id="kindInput" maxlength="20" placeholder="新しい種類（例：買い物、家計）" autocomplete="off">
+      </div>
+      <p class="hint">種類ごとに、履歴をしぼりこんで見られます。</p>
+      <div class="sheet-actions">
+        <button type="button" class="ghost" data-close>やめる</button>
+        <button type="submit" class="primary" id="nameSave">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- この電卓について -->
+  <dialog class="sheet" id="aboutDialog" aria-labelledby="aboutTitle">
+    <div class="sheet-head">
+      <h2 id="aboutTitle">この電卓について</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="about">
+      <h3>誤差を出さないしくみ</h3>
+      <p>数を「分数のまま」持って計算するので、たし算・ひき算・かけ算・わり算は誤差ゼロです（1÷3×3 ＝ ぴったり 1）。約10万桁までの数を正確に持てます。</p>
+      <p>√ のように割り切れない計算は、80桁で計算して上から50桁を出します。それより大きな数は「×10の〇乗」の形になります（10 の 1000兆乗 まで）。</p>
+      <h3>計算のきまり</h3>
+      <ul>
+        <li>× ÷ を先に、＋ − をあとで計算します。( ) の中が先です。</li>
+        <li>2(3+4) や 2√3 のように、× を省いてもかけ算になります。</li>
+        <li>−2² は −4（2乗が先）、2^3^2 は 2^9 です。</li>
+        <li>% は「100で割る」です。ただし ＋ − の後ろの % は「左の数の〇%」です（200＋10% ＝ 220）。</li>
+        <li>閉じていない ( は、＝ を押すと最後に閉じます。</li>
+      </ul>
+      <h3>式の途中を直す</h3>
+      <p>式をタップすると、そこにカーソルが入ります。◀ ▶ で1つずつ動かせます。⌫ はカーソルの左を消し、数字はカーソルのところに入ります。</p>
+      <p class="hint">履歴やいまの式は、このスマホの中（ブラウザ）にだけ保存されます。</p>
+      <p class="hint" id="aboutVersion"></p>
+    </div>
+  </dialog>
+
+  <!-- メニュー -->
+  <div class="menu" id="menu" hidden role="menu">
+    <label class="menu-item" role="menuitemcheckbox">
+      <input type="checkbox" id="setVibrate">
+      <span>キーを押したときに震える<small>（対応しているスマホだけ）</small></span>
+    </label>
+    <button type="button" class="menu-item" role="menuitem" id="btnInstall">ホーム画面に追加</button>
+    <button type="button" class="menu-item" role="menuitem" id="btnAbout">この電卓について</button>
+  </div>
+
+  <div class="toast" id="toast" hidden role="status"></div>
+</body>
+</html>
