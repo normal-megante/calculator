@@ -23,9 +23,38 @@ const FORWARD = { asin: 'sin', acos: 'cos', atan: 'tan' };
 //   関数電卓：sin → sin⁻¹（角度がちがっても sin が同じなら ✓。same はぴったり同じか）、
 //             sin⁻¹ → sin、log → 10^、ln → e^、n! → ÷n で (n−1)!、
 //             nCr → ×r!×(n−r)! で n!、nPr → ×(n−r)! で n!、x⁻¹ → 1÷
+//   ステップ14：log(a, x) → a^答え、ⁿ√(n, x) → 答え^n、gcd → 割った商の最大公約数が 1、
+//             lcm → 割った商の最大公約数が 1、mod → 割る数×商＋あまり、n!! → ÷n で (n−2)!!、
+//             n# → ÷p で (p−1)#（p は n 以下でいちばん大きい素数）、sf(n) → ÷n! で sf(n−1)、
+//             H(n) → ÷nⁿ で H(n−1)、Γ(x) → Γ(x+1) ÷ x、sinh → sinh⁻¹ など、|x| → ±
 // ---------------------------------------------------------
 function isEvenInteger(x) {
   return N.isInteger(x) && x.n % 2n === 0n;
+}
+
+// a と b が、上から digits 桁くらいまで同じか
+function sameDigits(a, b, digits) {
+  const d = N.sub(a, b, N.P + 20);
+  if (N.isZero(d)) return true;
+  if (N.isZero(b)) return false;
+  return N.approxLog10(N.absNum(d)) - N.approxLog10(N.absNum(b)) <= -digits;
+}
+
+// cosh・tanh の答えから元の数にもどすとき、消えてしまう桁の数（おおよそ）
+//   cosh：0 に近い x は cosh x が 1 にとても近い。tanh：大きい x は tanh x が ±1 にとても近い
+function lostDigits(name, a) {
+  const x = Math.abs(N.toNumber(a));
+  if (x === 0) return 0;
+  if (name === 'cosh') return Math.max(0, -Math.log10(Math.tanh(x) * x));
+  if (x > 300) return Infinity;
+  return Math.max(0, Math.log10(Math.sinh(2 * x) / (2 * x)));
+}
+
+// 割った商の最大公約数が 1 か（gcd・lcm の検算）
+function coprimeCheck(op, x, list, quotients) {
+  const allInt = quotients.every(N.isInteger);
+  const value = allInt ? S.gcdOf(quotients) : N.ZERO;
+  return { op, x, list, quotients, value, expect: N.ONE, ok: allInt && N.cmp(value, N.ONE) === 0 };
 }
 
 function reverseRaw(s) {
@@ -93,6 +122,70 @@ function reverseRaw(s) {
     }
     case '⁻¹':
       return { op: '÷', x: N.ONE, y: s.result, value: N.div(N.ONE, s.result), expect: s.a };
+    // ---- ステップ14 ----
+    case 'logb':
+      return { op: 'logb', x: s.result, base: s.a, value: N.pow(s.a, s.result), expect: s.b };
+    case 'nroot':
+      return { op: 'nroot', x: s.result, n: s.a, value: N.pow(s.result, s.a), expect: s.b };
+    case 'gcd':
+      if (N.isZero(s.result)) return { none: '全部 0 なので、逆算するものはありません' };
+      return coprimeCheck('gcd', s.result, s.list, s.list.map((v) => N.div(v, s.result)));
+    case 'lcm':
+      if (N.isZero(s.result)) return { none: '0 があるので lcm は 0 です（逆算するものはありません）' };
+      return coprimeCheck('lcm', s.result, s.list.map(N.absNum), s.list.map((v) => N.div(s.result, N.absNum(v))));
+    case 'mod': {
+      const q = N.frac(s.q);
+      return { op: 'mod', x: s.result, y: s.b, q, value: N.add(N.mul(s.b, q), s.result), expect: s.a };
+    }
+    case '!!': {
+      const n = S.intOf(s.a);
+      if (n <= 1n) return { none: '0!! と 1!! は 1 ときまっているので、逆算するものはありません' };
+      const k = N.frac(n - 2n);
+      return { op: 'dfact', x: s.result, y: s.a, k, value: N.div(s.result, s.a), expect: S.doubleFactorial(k) };
+    }
+    case '#': {
+      const p = S.largestPrimeAtMost(s.a);
+      if (p === null) return { none: '0# と 1# は 1 ときまっているので、逆算するものはありません' };
+      const prime = N.frac(BigInt(p));
+      const k = N.frac(BigInt(p - 1));
+      return { op: 'prim', x: s.result, p: prime, n: s.a, k, value: N.div(s.result, prime), expect: S.primorial(k) };
+    }
+    case 'sf': {
+      const n = S.intOf(s.a);
+      if (n <= 1n) return { none: 'sf(0) と sf(1) は 1 なので、逆算するものはありません' };
+      const k = N.frac(n - 1n);
+      return { op: 'sf', x: s.result, n: s.a, k, value: N.div(s.result, S.factorial(s.a)), expect: S.superfactorial(k) };
+    }
+    case 'hf': {
+      const n = S.intOf(s.a);
+      if (n <= 1n) return { none: 'H(0) と H(1) は 1 なので、逆算するものはありません' };
+      const k = N.frac(n - 1n);
+      return { op: 'hf', x: s.result, n: s.a, k, value: N.div(s.result, N.pow(s.a, s.a)), expect: S.hyperfactorial(k) };
+    }
+    // Γ(x+1) ＝ x × Γ(x) を使う
+    case 'gamma': {
+      const a1 = N.add(s.a, N.ONE);
+      return { op: 'gamma', x: s.result, a: s.a, a1, value: N.div(S.gamma(a1), s.a), expect: s.result };
+    }
+    case 'sinh':
+      return { op: 'asinh', x: s.result, value: S.asinh(s.result), expect: s.a };
+    case 'cosh':
+    case 'tanh': {
+      const digits = Math.floor(62 - lostDigits(s.op, s.a));
+      if (digits < 12) {
+        return { none: s.op === 'cosh'
+          ? 'cosh の答えが 1 に近すぎて、元の数にもどす桁が足りません'
+          : 'tanh の答えが ±1 に近すぎて、元の数にもどす桁が足りません' };
+      }
+      const value = s.op === 'cosh' ? S.acosh(s.result) : S.atanh(s.result);
+      const expect = s.op === 'cosh' ? N.absNum(s.a) : s.a;
+      return {
+        op: s.op === 'cosh' ? 'acosh' : 'atanh', x: s.result, value, expect,
+        ok: sameDigits(value, expect, digits), digits, minus: s.op === 'cosh' && N.sign(s.a) < 0,
+      };
+    }
+    case 'abs':
+      return { op: 'abs', x: s.result, value: N.sign(s.a) < 0 ? N.neg(s.result) : s.result, expect: s.a };
     default:
       return { none: 'この計算は逆算できません' };
   }

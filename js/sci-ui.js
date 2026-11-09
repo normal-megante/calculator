@@ -5,6 +5,8 @@
 //   ・逆：sin → sin⁻¹、cos → cos⁻¹、tan → tan⁻¹、log → 10ˣ、ln → eˣ（1回使うと元にもどる）
 //   ・度/rad：三角関数の角度のモード、分数：答えを分数で出す（どちらも設定に保存）
 //   ・素因数：いまの答え（整数）を素因数分解する（検算の画面を借りて出す）
+//   ・右はしの「もっと」：2ページ目（log(底, 数)・ⁿ√・gcd・lcm・n!!・sf・H・n#・Γ・sinh など）。
+//     どちらのページかは設定に保存（sciPage2）
 // =========================================================
 import * as N from './num.js';
 import * as F from './format.js';
@@ -29,6 +31,15 @@ const SURE_PRIME = 3317044064679887385961981n; // これより小さい数は、
 
 let h = null;
 let inverse = false;
+
+// 「,」で区切る関数は、はじめて押したときに打ち方を知らせる
+const HOW_TO = {
+  'log(': '底を変える log：log(底, 数) と打ちます（log(2, 8) ＝ 3）。数だけなら 10 が底',
+  'root(': 'ⁿ√(n, 数) と打ちます（ⁿ√(3, 8) ＝ 2）',
+  'gcd(': 'gcd(12, 18) のように「,」（区切り）で数を分けます。3つ以上も',
+  'lcm(': 'lcm(4, 6) のように「,」（区切り）で数を分けます。3つ以上も',
+};
+const told = new Set();
 
 // handlers：{ settings(), saveSetting(変える所), pressKey(部品, ボタン), currentValue(), rerender() }
 export function initSci(handlers) {
@@ -55,6 +66,13 @@ export function applySci() {
   $('#btnSci').setAttribute('aria-pressed', String(open));
   $('#btnAngle').innerHTML = `<small>角度</small>${S.getAngle() === 'deg' ? '度' : 'rad'}`;
   $('#btnFrac').setAttribute('aria-pressed', String(Boolean(s.frac)));
+  const page2 = Boolean(s.sciPage2);
+  $('#sciPage1').hidden = page2;
+  $('#sciPage2').hidden = !page2;
+  const pageKey = $('#btnSciPage');
+  pageKey.textContent = page2 ? 'もどる' : 'もっと';
+  pageKey.setAttribute('aria-pressed', String(page2));
+  pageKey.setAttribute('aria-label', page2 ? '1ページ目の関数のキーにもどる' : 'ほかの関数のキー（2ページ目）を出す');
   showLabels();
 }
 
@@ -89,6 +107,10 @@ function press(key, b) {
     case 'factor':
       if (!openFactor(h.currentValue())) shake(b, s);
       return;
+    case 'page':
+      h.saveSetting({ sciPage2: !s.sciPage2 });
+      applySci();
+      return;
     default: {
       const pair = FN_KEYS[key];
       const token = pair ? pair[inverse ? 1 : 0] : key;
@@ -97,6 +119,10 @@ function press(key, b) {
         showLabels();
       }
       h.pressKey(token, b);
+      if (HOW_TO[key] && !pair && !told.has(key)) {
+        told.add(key);
+        toast(HOW_TO[key]);
+      }
     }
   }
 }

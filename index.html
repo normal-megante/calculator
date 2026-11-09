@@ -53,8 +53,10 @@
       </div>
     </section>
 
-    <!-- 関数のキー（「関数」で出す・しまう） -->
+    <!-- 関数のキー（「関数」で出す・しまう。右はしの「もっと」で2ページ目） -->
     <section class="sci-pad" id="sciPad" aria-label="関数のキー" hidden>
+      <button type="button" class="k sk page" data-sci="page" id="btnSciPage" aria-pressed="false">もっと</button>
+      <div class="sci-page" id="sciPage1">
       <button type="button" class="k sk" data-sci="inv" id="btnInv" aria-pressed="false" aria-label="逆の関数（sin⁻¹・10ˣ など）">逆</button>
       <button type="button" class="k sk" data-sci="sin">sin</button>
       <button type="button" class="k sk" data-sci="cos">cos</button>
@@ -72,6 +74,28 @@
       <button type="button" class="k sk" data-sci="⁻¹" aria-label="逆数（1 ÷ x）">x<sup>−1</sup></button>
       <button type="button" class="k sk" data-sci="frac" id="btnFrac" aria-pressed="false" aria-label="答えを分数で出す">分数</button>
       <button type="button" class="k sk" data-sci="factor" aria-label="いまの答えを素因数分解">素因数</button>
+      </div>
+
+      <!-- 2ページ目（ステップ14） -->
+      <div class="sci-page" id="sciPage2" hidden>
+      <button type="button" class="k sk" data-sci="log(" aria-label="底を変える log：log(底, 数)">log<sub>a</sub>x</button>
+      <button type="button" class="k sk" data-sci="root(" aria-label="n 乗根：ⁿ√(n, 数)"><sup>n</sup>√x</button>
+      <button type="button" class="k sk" data-sci="," aria-label="区切りの「,」"><b class="big">,</b><small>区切り</small></button>
+      <button type="button" class="k sk" data-sci="gcd(" aria-label="最大公約数（gcd）">gcd<small>最大公約数</small></button>
+      <button type="button" class="k sk" data-sci="lcm(" aria-label="最小公倍数（lcm）">lcm<small>最小公倍数</small></button>
+
+      <button type="button" class="k sk" data-sci="!!" aria-label="二重階乗（n!!）">n!!<small>二重階乗</small></button>
+      <button type="button" class="k sk" data-sci="sf(" aria-label="超階乗（sf(n)）">sf(n)<small>超階乗</small></button>
+      <button type="button" class="k sk" data-sci="hf(" aria-label="ハイパー階乗（H(n)）">H(n)<small class="tight">ハイパー階乗</small></button>
+      <button type="button" class="k sk" data-sci="#" aria-label="素数階乗（n#）">n#<small>素数階乗</small></button>
+      <button type="button" class="k sk" data-sci="Γ(" aria-label="ガンマ関数（Γ(x)）">Γ(x)<small>ガンマ</small></button>
+
+      <button type="button" class="k sk" data-sci="sinh(">sinh</button>
+      <button type="button" class="k sk" data-sci="cosh(">cosh</button>
+      <button type="button" class="k sk" data-sci="tanh(">tanh</button>
+      <button type="button" class="k sk" data-sci="abs(" aria-label="絶対値（abs）">|x|<small>絶対値</small></button>
+      <button type="button" class="k sk" data-sci="mod" aria-label="あまり（mod）">mod<small>あまり</small></button>
+      </div>
     </section>
 
     <section class="keypad" id="keypad" aria-label="キー">
@@ -1007,6 +1031,16 @@
         <li><b>分数</b>：割り切れない答えを分数で出します（1÷3 → ⅓ の形）。√2 や π などは分数にできません。</li>
         <li><b>素因数</b>：いまの答え（2 以上・100桁までの整数）を素因数分解します（360 ＝ 2³ × 3² × 5）。大きい素数どうしのかけ算は、分けきれないことがあります。</li>
         <li>「✓ 検算」は、sin の答えを sin⁻¹ で角度にもどす、5! ÷ 5 ＝ 4! のように確かめます。</li>
+        <li>関数のキーの右はしの<b>もっと</b>で、2ページ目の関数が出ます（<b>もどる</b>で1ページ目）。</li>
+        <li><b>log<sub>a</sub>x</b>：底を変える log。log(2, 8) ＝ 3 のように「log(底, 数)」と打ちます（「,」は<b>区切り</b>キー）。数だけの log(100) は 10 が底のまま。<b>ⁿ√x</b>：ⁿ√(3, 8) ＝ 2（3乗根）。n が奇数なら負の数も（ⁿ√(3, −8) ＝ −2）。</li>
+        <li><b>gcd</b>（最大公約数）・<b>lcm</b>（最小公倍数）：gcd(12, 18) ＝ 6、lcm(4, 6) ＝ 12。3つ以上も「,」で区切って。整数だけ。</li>
+        <li><b>mod</b>：あまり。17 mod 5 ＝ 2。× ÷ と同じ順番に計算します。マイナスがあるときは、答えは割る数と同じ符号（−7 mod 3 ＝ 2）。</li>
+        <li><b>n!!</b>（二重階乗）：7!! ＝ 7×5×3×1 ＝ 105、8!! ＝ 8×6×4×2 ＝ 384。(n!)! のことではありません。n! のあとに ! をもう一度押しても n!! になります。</li>
+        <li><b>sf(n)</b>（超階乗）：1!×2!×…×n!（sf(4) ＝ 288）。「超階乗」には、ほかの決め方（n$ など）もあります。<b>H(n)</b>（ハイパー階乗）：1¹×2²×…×nⁿ（H(3) ＝ 108）。どちらも n は 10万 まで。</li>
+        <li><b>n#</b>（素数階乗）：n 以下の素数を全部かけたもの（10# ＝ 2×3×5×7 ＝ 210）。n は 100万 まで。</li>
+        <li><b>Γ(x)</b>（ガンマ関数）：Γ(n) ＝ (n−1)!。整数でない数にも使えます（Γ(0.5) ＝ √π）。0 と負の整数は値がありません。</li>
+        <li><b>sinh cosh tanh</b>（双曲線関数）：sinh x ＝ (eˣ − e⁻ˣ)/2 など。角度ではないので「度・rad」は関係ありません。<b>|x|</b>：絶対値（abs(−3) ＝ 3）。</li>
+        <li>答えが10万桁までなら正確に、それより大きいものは概数（上から50桁）で出します。「✓ 検算」は、8!! ÷ 8 ＝ 6!!、log(2, 8) ＝ 3 → 2³ ＝ 8、17 mod 5 → 5×3＋2 ＝ 17 のように確かめます。</li>
       </ul>
       <h3>単位</h3>
       <ul>

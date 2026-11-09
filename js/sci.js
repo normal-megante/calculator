@@ -427,3 +427,459 @@ export function factorize(n, { budget = 200000 } = {}) {
 // 指数を小さい字に（2³）
 const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
 export const supText = (k) => String(k).replace(/\d/g, (d) => SUP[d]);
+
+// =========================================================
+// ステップ14：関数を増やす
+//   log(a, x)（底を変える log）・ⁿ√(n, x)（n 乗根）・gcd・lcm・mod（あまり）
+//   n!!（二重階乗）・n#（素数階乗）・sf(n)（超階乗）・H(n)（ハイパー階乗）・Γ(x)（ガンマ関数）
+//   sinh・cosh・tanh（双曲線関数）・abs（絶対値）
+// =========================================================
+const LOG10_2 = Math.log10(2);
+
+// x 以下でいちばん大きい整数（BigInt）
+export function floorInt(x) {
+  let n;
+  let d;
+  if (x.q) {
+    n = x.n;
+    d = x.d;
+  } else {
+    if (x.e >= 0n) return x.m * N.pow10(x.e);
+    n = x.m;
+    d = N.pow10(-x.e);
+  }
+  return n >= 0n ? n / d : -((-n + d - 1n) / d);
+}
+
+// ---------------------------------------------------------
+// 底を変える log：log(a, x) ＝ a を何乗すると x になるか
+// ---------------------------------------------------------
+export function logb(a, x) {
+  const baseError = () => new CalcError('log の底は、0 より大きく 1 でない数だけです');
+  if (N.sign(a) <= 0 || (a.q && a.n === 1n && a.d === 1n)) throw baseError();
+  if (N.sign(x) <= 0) throw new CalcError('0 や負の数の log はありません');
+  if (a.q && x.q) {
+    const r = exactLog(a, x);
+    if (r) return r;
+  }
+  const p = P + 10;
+  const la = N.ln(a, p);
+  if (N.isZero(la)) throw baseError();
+  return N.toApprox(N.div(N.ln(x, p), la, p), P);
+}
+
+// a^r ＝ x になる分数 r（分母は 64 まで。log(4, 8) ＝ 3/2）を探す。なければ null
+function exactLog(a, x) {
+  if (x.n === x.d) return ZERO;
+  const guess = N.approxLog10(x) / N.approxLog10(a);
+  if (!Number.isFinite(guess) || Math.abs(guess) > 1e6) return null;
+  // 連分数で、分母の小さい分数の候補を出す
+  let [h0, h1, k0, k1] = [0, 1, 1, 0];
+  let v = guess;
+  for (let i = 0; i < 20; i++) {
+    const t = Math.floor(v);
+    [h0, h1] = [h1, t * h1 + h0];
+    [k0, k1] = [k1, t * k1 + k0];
+    if (k1 > 64) return null;
+    if (Math.abs(h1 / k1 - guess) < 1e-9 * Math.max(1, Math.abs(guess))) {
+      const r = N.frac(BigInt(h1), BigInt(k1));
+      try {
+        const y = N.pow(a, r);
+        return y.q && N.cmp(y, x) === 0 ? r : null;
+      } catch {
+        return null;
+      }
+    }
+    const f = v - t;
+    if (f < 1e-12) return null;
+    v = 1 / f;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------
+// n 乗根：ⁿ√(n, x)（n 回かけると x になる数。n が奇数なら負の数も）
+// ---------------------------------------------------------
+export function root(nx, x) {
+  if (N.isZero(nx)) throw new CalcError('ⁿ√ の n に 0 は使えません');
+  const k = nx.q ? intOf(nx) : null;
+  const odd = k !== null && k % 2n !== 0n;
+  if (N.sign(x) < 0 && !odd) throw new CalcError('負の数の ⁿ√ は、n が奇数のときだけです（偶数乗根は「複素数」で）');
+  if (N.isZero(x)) {
+    if (N.sign(nx) < 0) throw new CalcError('0 で割ることはできません');
+    return ZERO;
+  }
+  if (k !== null && x.q) {
+    // 割り切れる乗根なら正確に（ⁿ√(3, 8) ＝ 2）
+    const K = k < 0n ? -k : k;
+    const an = x.n < 0n ? -x.n : x.n;
+    const exactRoot = (v) => {
+      if (v === 1n) return 1n;
+      if (K > BigInt(N.bitLen(v))) return null; // 2 以上の数の K 乗は K ビットより大きい
+      const r = N.iroot(v, Number(K));
+      return r ** K === v ? r : null;
+    };
+    const rn = exactRoot(an);
+    const rd = rn === null ? null : exactRoot(x.d);
+    if (rn !== null && rd !== null) {
+      const r = N.frac(x.n < 0n ? -rn : rn, rd);
+      return k < 0n ? N.div(ONE, r) : r;
+    }
+  }
+  const r = N.pow(N.absNum(x), N.div(ONE, nx));
+  return N.sign(x) < 0 ? N.neg(r) : r;
+}
+
+// ---------------------------------------------------------
+// 最大公約数・最小公倍数（整数だけ。2つ以上）
+// ---------------------------------------------------------
+function intList(list, name) {
+  return list.map((x) => {
+    if (!x.q || x.d !== 1n) throw new CalcError(`${name} は整数だけです`);
+    return x.n;
+  });
+}
+
+export function gcdOf(list) {
+  let g = 0n;
+  for (const n of intList(list, 'gcd（最大公約数）')) g = gcd(g, n);
+  return N.frac(g);
+}
+
+export function lcmOf(list) {
+  let l = 1n;
+  for (const n of intList(list, 'lcm（最小公倍数）')) {
+    if (n === 0n) return ZERO;
+    const a = n < 0n ? -n : n;
+    l = (l / gcd(l, a)) * a;
+  }
+  return N.frac(l);
+}
+
+// BigInt の最大公約数（検算でも使う）
+export const gcdInt = (a, b) => gcd(a, b);
+
+// ---------------------------------------------------------
+// あまり：a mod b ＝ a − b × (a ÷ b 以下でいちばん大きい整数)
+//   答えは b と同じ符号（−7 mod 3 ＝ 2。n進法の mod と同じ）
+//   返す値：{ q: 商（BigInt）, r: あまり }
+// ---------------------------------------------------------
+export function mod(a, b) {
+  if (N.isZero(b)) throw new CalcError('0 で割ったあまりはありません');
+  const p = P + 10;
+  const qv = N.div(a, b, p);
+  if (!qv.q && N.approxLog10(N.absNum(qv)) > P - 25) {
+    throw new CalcError('割られる数が大きすぎて、あまりを正確に出せません');
+  }
+  let q = floorInt(qv);
+  if (!qv.q) {
+    // 概数の割り算がちょうど整数のときは、その整数（下の桁の誤差で 1 小さくならないように）
+    const near = nearestInt(qv);
+    if (N.cmp(qv, N.frac(near)) === 0) q = near;
+  }
+  return { q, r: N.sub(a, N.mul(b, N.frac(q), p)) };
+}
+
+// ---------------------------------------------------------
+// たくさんの正の整数をかけた答えの概数
+//   2進数で上の 384〜448 ビット（115桁くらい）だけ残しながらかける：値 ＝ m × 2^e
+// ---------------------------------------------------------
+const KEEP = 1n << 448n;
+
+class BinProduct {
+  constructor() {
+    this.m = 1n;
+    this.e = 0n;
+  }
+
+  times(k) {
+    this.m *= k;
+    while (this.m >= KEEP) {
+      this.m >>= 64n;
+      this.e += 64n;
+    }
+  }
+
+  timesProduct(other) {
+    this.m *= other.m;
+    this.e += other.e;
+    while (this.m >= KEEP) {
+      this.m >>= 64n;
+      this.e += 64n;
+    }
+  }
+
+  value(p = P) {
+    const wp = p + 10;
+    return N.toApprox(N.mul(N.frac(this.m), N.pow(I(2), N.frac(this.e), wp), wp), p);
+  }
+}
+
+// 整数の並びの積（半分ずつに分けてかける）
+function prodList(list, lo = 0, hi = list.length) {
+  if (hi - lo <= 16) {
+    let r = 1n;
+    for (let i = lo; i < hi; i++) r *= list[i];
+    return r;
+  }
+  const mid = (lo + hi) >> 1;
+  return prodList(list, lo, mid) * prodList(list, mid, hi);
+}
+
+// ---------------------------------------------------------
+// 二重階乗：n!! ＝ n × (n−2) × (n−4) × …（7!! ＝ 7×5×3×1 ＝ 105、8!! ＝ 8×6×4×2 ＝ 384）
+//   0!! ＝ 1、(−1)!! ＝ 1 ときめる
+// ---------------------------------------------------------
+// a × (a+2) × … × b（a と b は奇数）
+function oddProd(a, b) {
+  if (a > b) return 1n;
+  if (b - a < 48n) {
+    let r = a;
+    for (let i = a + 2n; i <= b; i += 2n) r *= i;
+    return r;
+  }
+  let m = (a + b) / 2n;
+  if (m % 2n === 0n) m -= 1n;
+  return oddProd(a, m) * oddProd(m + 2n, b);
+}
+
+export function doubleFactorial(x) {
+  const n = intOf(x);
+  if (n === null || n < -1n) throw new CalcError('n!! は −1 以上の整数だけです');
+  if (n <= 1n) return ONE;
+  const even = n % 2n === 0n;
+  const k = even ? n / 2n : (n - 1n) / 2n;
+  // 偶数：(2k)!! ＝ 2^k × k!、奇数：(2k+1)!! ＝ (2k+1)! ÷ (2^k × k!)
+  const digits = even
+    ? Number(k) * LOG10_2 + factDigits(k)
+    : factDigits(n) - Number(k) * LOG10_2 - factDigits(k);
+  if (digits <= EXACT_DIGITS) return N.frac(even ? prodRange(2n, k) << k : oddProd(3n, n));
+  const p = P + 20 + n.toString().length;
+  const kLn2 = N.mul(N.frac(k), N.ln(I(2), p), p);
+  const L = even
+    ? N.add(kLn2, lnFact(k, p), p)
+    : N.sub(N.sub(lnFact(n, p), kLn2, p), lnFact(k, p), p);
+  return N.exp(L, P);
+}
+
+// ---------------------------------------------------------
+// 素数階乗：n# ＝ n 以下の素数を全部かけたもの（10# ＝ 2×3×5×7 ＝ 210）
+// ---------------------------------------------------------
+export const PRIMORIAL_MAX = 1000000;
+
+function primesUpTo(n) {
+  const sieve = new Uint8Array(n + 1);
+  const list = [];
+  for (let i = 2; i <= n; i++) {
+    if (sieve[i]) continue;
+    list.push(i);
+    for (let j = i * i; j <= n; j += i) sieve[j] = 1;
+  }
+  return list;
+}
+
+function primorialCheck(x) {
+  const n = intOf(x);
+  if (n === null || n < 0n) throw new CalcError('n# は 0 以上の整数だけです');
+  if (n > BigInt(PRIMORIAL_MAX)) throw new CalcError('n# は n が 100万 までです');
+  return Number(n);
+}
+
+export function primorial(x) {
+  const ps = primesUpTo(primorialCheck(x));
+  let digits = 0;
+  for (const p of ps) digits += Math.log10(p);
+  if (digits <= EXACT_DIGITS) return N.frac(prodList(ps.map(BigInt)));
+  const prod = new BinProduct();
+  for (const p of ps) prod.times(BigInt(p));
+  return prod.value();
+}
+
+// n 以下でいちばん大きい素数（なければ null）。検算で使う
+export function largestPrimeAtMost(x) {
+  const n = primorialCheck(x);
+  for (let m = n; m >= 2; m--) if (isPrime(BigInt(m))) return m;
+  return null;
+}
+
+// ---------------------------------------------------------
+// 超階乗：sf(n) ＝ 1! × 2! × … × n!（sf(4) ＝ 1×2×6×24 ＝ 288）
+// ハイパー階乗：H(n) ＝ 1¹ × 2² × … × nⁿ（H(3) ＝ 1×4×27 ＝ 108）
+//   H(n) × sf(n) ＝ (n!)^(n+1) なので、大きい H(n) は (n!)^(n+1) ÷ sf(n) で出す
+// ---------------------------------------------------------
+export const SF_MAX = 100000;
+
+function smallInt(x, name) {
+  const n = intOf(x);
+  if (n === null || n < 0n) throw new CalcError(`${name} は 0 以上の整数だけです`);
+  if (n > BigInt(SF_MAX)) throw new CalcError(`${name} は n が 10万 までです`);
+  return Number(n);
+}
+
+// sf(n) の概数（と n! の概数）
+function superfactorialApprox(n) {
+  const f = new BinProduct();
+  const s = new BinProduct();
+  for (let k = 2n; k <= BigInt(n); k++) {
+    f.times(k);
+    s.timesProduct(f);
+  }
+  return { sf: s, fact: f };
+}
+
+export function superfactorial(x) {
+  const n = smallInt(x, 'sf(n)');
+  let lf = 0;
+  let digits = 0;
+  for (let k = 2; k <= n && digits <= EXACT_DIGITS; k++) {
+    lf += Math.log10(k);
+    digits += lf;
+  }
+  if (digits <= EXACT_DIGITS) {
+    let f = 1n;
+    let s = 1n;
+    for (let k = 2n; k <= BigInt(n); k++) {
+      f *= k;
+      s *= f;
+    }
+    return N.frac(s);
+  }
+  return superfactorialApprox(n).sf.value();
+}
+
+export function hyperfactorial(x) {
+  const n = smallInt(x, 'H(n)');
+  let digits = 0;
+  for (let k = 2; k <= n && digits <= EXACT_DIGITS; k++) digits += k * Math.log10(k);
+  if (digits <= EXACT_DIGITS) {
+    let s = 1n;
+    for (let k = 2n; k <= BigInt(n); k++) s *= k ** k;
+    return N.frac(s);
+  }
+  const p = P + 20;
+  const { sf, fact } = superfactorialApprox(n);
+  return N.toApprox(N.div(N.pow(fact.value(p), I(n + 1), p), sf.value(p), p), P);
+}
+
+// ---------------------------------------------------------
+// ガンマ関数：Γ(x)。Γ(n) ＝ (n−1)!（整数でない数にも「階乗」を広げたもの）
+//   Γ(½) ＝ √π。0 と負の整数は値がない
+//   x が小さいときは Γ(x) ＝ Γ(x+s) ÷ (x(x+1)…(x+s−1)) で大きくしてからスターリングの公式
+//   負の数は Γ(x) ＝ π ÷ (sin(πx) × Γ(1−x))
+// ---------------------------------------------------------
+const GAMMA_SHIFT = 2000;
+
+// ln Γ(y)（y が大きいとき。スターリングの公式）
+function lnGammaBig(y, p) {
+  let s = N.sub(N.mul(N.sub(y, HALF, p), N.ln(y, p), p), y, p);
+  s = N.add(s, N.mul(HALF, N.ln(N.mul(I(2), N.pi(p), p), p), p), p);
+  const y2 = N.mul(y, y, p);
+  let power = y;
+  BERNOULLI.forEach(([bn, bd], i) => {
+    const k = BigInt(i + 1);
+    s = N.add(s, N.div(N.frac(bn, bd * 2n * k * (2n * k - 1n)), power, p), p);
+    power = N.mul(power, y2, p);
+  });
+  return s;
+}
+
+// x > 0 の Γ(x)（p 桁）
+function gammaPos(x, p) {
+  let y = N.toApprox(x, p);
+  let prod = ONE;
+  const shift = Math.ceil(GAMMA_SHIFT - N.toNumber(y));
+  for (let i = 0; i < shift; i++) {
+    prod = N.mul(prod, y, p);
+    y = N.add(y, ONE, p);
+  }
+  return N.div(N.exp(lnGammaBig(y, p), p), prod, p);
+}
+
+export function gamma(x) {
+  if (!x.q) {
+    const k = nearestInt(x);
+    if (N.cmp(x, N.frac(k)) === 0) x = N.frac(k);
+  }
+  if (x.q && x.d === 1n) {
+    if (x.n <= 0n) throw new CalcError('Γ(0)・Γ(−1)・Γ(−2)… は値がありません（限りなく大きくなります）');
+    return factorial(N.frac(x.n - 1n));
+  }
+  const p = P + 20;
+  if (N.sign(x) < 0) {
+    if (N.approxLog10(N.absNum(x)) > 15) throw new CalcError('数が大きすぎて扱えません');
+    const s = N.sinCosTurn(N.div(x, I(2), p), p).sin; // sin(πx)：πx は x/2 回転
+    return N.toApprox(N.div(N.pi(p), N.mul(s, gammaPos(N.sub(ONE, x, p), p), p), p), P);
+  }
+  return N.toApprox(gammaPos(x, p), P);
+}
+
+// ---------------------------------------------------------
+// 双曲線関数：sinh x ＝ (eˣ − e⁻ˣ)/2、cosh x ＝ (eˣ + e⁻ˣ)/2、tanh x ＝ sinh x ÷ cosh x
+//   （角度ではないので、度・rad は関係なし）
+// ---------------------------------------------------------
+const TINY = -30; // |x| が 10^−30 より小さいときは、級数の頭だけで十分
+const cube = (x) => N.mul(N.mul(x, x), x);
+
+// 0 に近い x は、引き算で桁が消えるので、その分だけ桁を増やす
+const extraFor = (x) => Math.max(0, Math.ceil(-N.approxLog10(N.absNum(x))));
+
+function sinhP(x, p) {
+  const ex = N.exp(x, p);
+  return N.div(N.sub(ex, N.div(ONE, ex, p), p), I(2), p);
+}
+
+function coshP(x, p) {
+  const ex = N.exp(x, p);
+  return N.div(N.add(ex, N.div(ONE, ex, p), p), I(2), p);
+}
+
+export function sinh(x) {
+  if (N.isZero(x)) return ZERO;
+  if (N.approxLog10(N.absNum(x)) < TINY) return N.toApprox(N.add(x, N.div(cube(x), I(6))), P);
+  return N.toApprox(sinhP(x, P + 10 + extraFor(x)), P);
+}
+
+export function cosh(x) {
+  if (N.isZero(x)) return ONE;
+  return N.toApprox(coshP(x, P + 10), P);
+}
+
+export function tanh(x) {
+  if (N.isZero(x)) return ZERO;
+  const lg = N.approxLog10(N.absNum(x));
+  if (lg < TINY) return N.toApprox(N.sub(x, N.div(cube(x), I(3))), P);
+  if (lg > 2.5) return N.toApprox(I(N.sign(x))); // 1 との差が 10^−270 より小さい
+  const p = P + 10 + extraFor(x);
+  return N.toApprox(N.div(sinhP(x, p), coshP(x, p), p), P);
+}
+
+// 逆の関数（検算用）
+export function asinh(y) {
+  if (N.isZero(y)) return ZERO;
+  if (N.sign(y) < 0) return N.neg(asinh(N.neg(y)));
+  const lg = N.approxLog10(y);
+  if (lg < TINY) return N.toApprox(N.sub(y, N.div(cube(y), I(6))), P);
+  const p = P + 10 + extraFor(y);
+  if (lg > 45) return N.toApprox(N.ln(N.mul(I(2), y, p), p), P); // ln 2y（ちがいは 10^−90 より小さい）
+  return N.toApprox(N.ln(N.add(y, N.sqrt(N.add(N.mul(y, y, p), ONE, p), p), p), p), P);
+}
+
+export function acosh(y) {
+  const c = N.cmp(y, ONE);
+  if (c < 0) throw new CalcError('cosh⁻¹ は 1 以上の数だけです');
+  if (c === 0) return ZERO;
+  const p = P + 20;
+  if (N.approxLog10(y) > 45) return N.toApprox(N.ln(N.mul(I(2), y, p), p), P);
+  return N.toApprox(N.ln(N.add(y, N.sqrt(N.sub(N.mul(y, y, p), ONE, p), p), p), p), P);
+}
+
+export function atanh(y) {
+  if (N.isZero(y)) return ZERO;
+  if (N.cmp(N.absNum(y), ONE) >= 0) throw new CalcError('tanh⁻¹ は −1 より大きく 1 より小さい数だけです');
+  const lg = N.approxLog10(N.absNum(y));
+  if (lg < TINY) return N.toApprox(N.add(y, N.div(cube(y), I(3))), P);
+  const p = P + 20 + extraFor(y);
+  return N.toApprox(N.mul(HALF, N.ln(N.div(N.add(ONE, y, p), N.sub(ONE, y, p), p), p), p), P);
+}
+
+export const abs = (x) => N.absNum(x);

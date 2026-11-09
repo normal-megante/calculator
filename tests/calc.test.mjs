@@ -237,3 +237,54 @@ test('キー：関数の部品', () => {
   assert.deepEqual(press(['sin(', 'back']).items, []);                   // sin( はまとめて消える
   assert.deepEqual(press(['log(', '5', ')', ')']).items, ['log(', '5', ')']); // 閉じる ( がなければ ) は入らない
 });
+
+// ---- ステップ14：関数を増やす ----
+test('関数（ステップ14）：式の中で', () => {
+  assert.equal(run(['log(', '2', ',', '8', ')']), '3');
+  assert.equal(run(['log(', '1', '0', '0']), '2');                  // 数だけなら 10 が底
+  assert.equal(run(['root(', '3', ',', '−', '8']), '−2');
+  assert.equal(run(['gcd(', '1', '2', ',', '1', '8', ',', '8']), '2');
+  assert.equal(run(['lcm(', '4', ',', '6']), '12');
+  assert.equal(run(['1', '7', 'mod', '5']), '2');
+  assert.equal(run(['2', '×', '7', 'mod', '4']), '2');               // × と同じ順番：(2×7) mod 4
+  assert.equal(run(['1', '+', '7', 'mod', '4']), '4');               // ＋ より先
+  assert.equal(run(['7', '!!']), '105');
+  assert.equal(run(['1', '0', '#']), '210');
+  assert.equal(run(['sf(', '4']), '288');
+  assert.equal(run(['hf(', '3']), '108');
+  assert.equal(run(['Γ(', '5']), '24');
+  assert.equal(run(['abs(', '−', '3']), '3');
+  assert.equal(run(['cosh(', '0']), '1');
+  assert.equal(run(['2', 'gcd(', '4', ',', '6', ')']), '4');         // 2 × gcd(4, 6)
+  assert.throws(() => evaluate(['root(', '8']), /n と数/);
+  assert.throws(() => evaluate(['gcd(', '8']), /2つ以上/);
+  assert.throws(() => evaluate(['sin(', '1', ',', '2']), /1つだけ/);
+  assert.throws(() => evaluate(['1', ',', '2']), /区切る/);
+  assert.throws(() => evaluate(['(', '1', ',', '2', ')']), /区切る/);
+  assert.throws(() => evaluate(['log(', '2', ',', '3', ',', '4']), /log\(底, 数\)/);
+  assert.throws(() => evaluate(['gcd(', '4', ',', ')']), /「,」のあとに数がありません/);
+  const r = evaluate(['7', '!!', '+', 'sinh(', '1', ')']);
+  assert.deepEqual(r.notes, [{ kind: 'fn', name: 'dfact' }, { kind: 'fn', name: 'hyp' }]);
+  assert.equal(r.notes.some((n) => n.kind === 'angle'), false);      // sinh は角度のモードに関係なし
+  assert.deepEqual(evaluate(['log(', '2', ',', '8']).steps.map((s) => s.op), ['logb']);
+  assert.equal(preview(['log(', '2', ',']), null);                   // 「,」で終わっているときは出さない
+  assert.equal(F.compact(preview(['log(', '2', ',', '8']).value).text, '3');
+});
+
+test('キー：ステップ14の部品', () => {
+  const press = (keys) => keys.reduce((s, k) => pressKey(s, k) ?? s, { items: [], caret: 0 });
+  assert.deepEqual(press(['5', '!', '!']).items, ['5', '!!']);          // ! を2回で二重階乗
+  assert.deepEqual(press(['5', '!', '!', '!']).items, ['5', '!!']);
+  assert.deepEqual(press(['5', '#']).items, ['5', '#']);
+  assert.equal(pressKey({ items: [], caret: 0 }, '#'), null);
+  assert.deepEqual(press(['gcd(', '4', ',', '6']).items, ['gcd(', '4', ',', '6']);
+  assert.equal(pressKey({ items: ['4'], caret: 1 }, ','), null);                // ( の外では打てない
+  assert.equal(pressKey({ items: ['(', '4'], caret: 2 }, ','), null);           // ふつうの ( の中も
+  assert.equal(pressKey({ items: ['sin(', '4'], caret: 2 }, ','), null);        // 数が1つだけの関数も
+  assert.equal(pressKey({ items: ['gcd('], caret: 1 }, ','), null);             // 数の前は打てない
+  const nested = ['log(', '(', '1', '+', '1', ')', ',', '8'];
+  assert.deepEqual(press(nested).items, nested);
+  assert.equal(pressKey({ items: ['gcd(', '4', ','], caret: 3 }, '×'), null);   // 「,」のすぐ後に × は入らない
+  assert.deepEqual(press(['7', 'mod', '3']).items, ['7', 'mod', '3']);
+  assert.deepEqual(press(['7', '×', 'mod']).items, ['7', 'mod']);               // 演算子の置きかえ
+});

@@ -9,8 +9,10 @@ export const $ = (selector) => document.querySelector(selector);
 // 部品の見た目の種類
 function classOf(t) {
   if (['+', '−', '×', '÷', '^', 'C', 'P'].includes(t)) return 'tk op';
+  if (t === 'mod') return 'tk op word';
   if (t === '(' || t === ')') return 'tk paren';
-  if (['√', '%', '²', '!', '⁻¹'].includes(t)) return 'tk fn';
+  if (t === ',') return 'tk paren comma';
+  if (['√', '%', '²', '!', '⁻¹', '!!', '#'].includes(t)) return 'tk fn';
   if (isFnToken(t)) return 'tk func';
   if (t === 'π' || t === 'e') return 'tk konst';
   if (isVar(t)) return 'tk var';
@@ -19,7 +21,7 @@ function classOf(t) {
 }
 
 // 部品の画面での書き方（asin( は sin⁻¹( と書く）
-const SHOW_AS = { 'asin(': 'sin⁻¹(', 'acos(': 'cos⁻¹(', 'atan(': 'tan⁻¹(' };
+const SHOW_AS = { 'asin(': 'sin⁻¹(', 'acos(': 'cos⁻¹(', 'atan(': 'tan⁻¹(', 'root(': 'ⁿ√(', 'hf(': 'H(' };
 export const tokenText = (t) => SHOW_AS[t] ?? t;
 
 // 式（部品の並び）を container の中に表示する。

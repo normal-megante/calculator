@@ -148,3 +148,115 @@ test(`Python と答え合わせ（関数電卓 ${cases.length} 件）`, () => {
     assert.equal(g.neg, c.want.neg, `${name} の符号`);
   }
 });
+
+// ---- ステップ14：関数を増やす ----
+test('底を変える log・n 乗根', () => {
+  exact(S.logb(I(2), I(8)), 3n);
+  exact(S.logb(I(4), I(2)), 1n, 2n);
+  exact(S.logb(I(4), I(8)), 3n, 2n);
+  exact(S.logb(N.frac(1n, 2n), I(8)), -3n);
+  exact(S.logb(I(10), N.frac(1n, 1000n)), -3n);
+  exact(S.logb(I(7), I(1)), 0n);
+  near(S.logb(I(2), I(3)), N.div(N.ln(I(3)), N.ln(I(2))));
+  near(S.logb(S.E, S.E), I(1));
+  assert.throws(() => S.logb(I(1), I(5)), /底/);
+  assert.throws(() => S.logb(I(-2), I(5)), /底/);
+  assert.throws(() => S.logb(I(2), I(0)), /log/);
+  exact(S.root(I(3), I(-8)), -2n);
+  exact(S.root(I(3), N.frac(8n, 27n)), 2n, 3n);
+  exact(S.root(I(100), N.frac(2n ** 100n)), 2n);
+  exact(S.root(I(-2), I(4)), 1n, 2n);
+  exact(S.root(N.frac(3n, 2n), I(8)), 4n);
+  near(S.root(I(2), I(2)), N.sqrt(I(2)));
+  near(S.root(I(3), I(-2)), N.neg(N.pow(I(2), N.frac(1n, 3n))));
+  assert.throws(() => S.root(I(2), I(-4)), /奇数/);
+  assert.throws(() => S.root(I(0), I(4)), /0/);
+});
+
+test('最大公約数・最小公倍数・mod', () => {
+  exact(S.gcdOf([I(12), I(18)]), 6n);
+  exact(S.gcdOf([I(12), I(18), I(8)]), 2n);
+  exact(S.gcdOf([I(-12), I(18)]), 6n);
+  exact(S.gcdOf([I(0), I(5)]), 5n);
+  exact(S.lcmOf([I(4), I(6)]), 12n);
+  exact(S.lcmOf([I(2), I(3), I(4)]), 12n);
+  exact(S.lcmOf([I(-4), I(6)]), 12n);
+  exact(S.lcmOf([I(0), I(3)]), 0n);
+  assert.throws(() => S.gcdOf([N.frac(1n, 2n), I(3)]), /整数/);
+  const m = (a, b) => S.mod(a, b).r;
+  exact(m(I(17), I(5)), 2n);
+  exact(m(I(-7), I(3)), 2n);              // 答えは割る数と同じ符号
+  exact(m(I(7), I(-3)), -2n);
+  exact(m(num('5.5'), I(2)), 3n, 2n);
+  exact(m(num('0.3'), num('0.1')), 0n);   // 分数のまま計算するので 0 ちょうど
+  near(m(S.PI, I(1)), N.sub(S.PI, I(3)));
+  assert.equal(S.mod(I(-7), I(3)).q, -3n);
+  assert.throws(() => S.mod(I(5), I(0)), /0 で割った/);
+});
+
+test('二重階乗・素数階乗・超階乗・ハイパー階乗', () => {
+  exact(S.doubleFactorial(I(7)), 105n);
+  exact(S.doubleFactorial(I(8)), 384n);
+  exact(S.doubleFactorial(I(0)), 1n);
+  exact(S.doubleFactorial(I(-1)), 1n);
+  assert.throws(() => S.doubleFactorial(I(-2)), /−1 以上/);
+  // 大きいと概数：n!! × (n−1)!! ＝ n!
+  near(N.mul(S.doubleFactorial(I(100001)), S.doubleFactorial(I(100000))), S.factorial(I(100001)));
+  exact(S.primorial(I(10)), 210n);
+  exact(S.primorial(I(13)), 30030n);
+  exact(S.primorial(I(1)), 1n);
+  assert.equal(S.largestPrimeAtMost(I(10)), 7);
+  assert.equal(S.largestPrimeAtMost(I(1)), null);
+  assert.throws(() => S.primorial(I(1000001)), /100万/);
+  exact(S.superfactorial(I(4)), 288n);
+  exact(S.superfactorial(I(10)), 6658606584104736522240000000n);
+  exact(S.hyperfactorial(I(3)), 108n);
+  exact(S.hyperfactorial(I(5)), 86400000n);
+  assert.throws(() => S.superfactorial(I(100001)), /10万/);
+  // 概数のかけ算（2進数で上だけ残す）が、正確に出した値と50桁合う
+  let f = 1n;
+  let sf = 1n;
+  for (let k = 2n; k <= 400n; k++) {
+    f *= k;
+    sf *= f;
+  }
+  assert.equal(S.superfactorial(I(400)).q, false);
+  near(S.superfactorial(I(400)), N.toApprox(N.frac(sf)));
+  let hf = 1n;
+  for (let k = 2n; k <= 300n; k++) hf *= k ** k;
+  assert.equal(S.hyperfactorial(I(300)).q, false);
+  near(S.hyperfactorial(I(300)), N.toApprox(N.frac(hf)));
+});
+
+test('ガンマ関数', () => {
+  exact(S.gamma(I(5)), 24n);
+  exact(S.gamma(I(1)), 1n);
+  near(S.gamma(N.frac(1n, 2n)), N.sqrt(S.PI));
+  near(N.mul(S.gamma(N.frac(1n, 2n)), S.gamma(N.frac(1n, 2n))), S.PI);   // Γ(½)² ＝ π
+  near(S.gamma(N.frac(-1n, 2n)), N.mul(I(-2), N.sqrt(S.PI)));             // Γ(−½) ＝ −2√π
+  near(S.gamma(N.frac(5n, 2n)), N.mul(N.frac(3n, 4n), N.sqrt(S.PI)));     // Γ(5/2) ＝ 3√π/4
+  const x = num('0.1');
+  near(S.gamma(N.add(x, I(1))), N.mul(x, S.gamma(x)));                    // Γ(x+1) ＝ x Γ(x)
+  near(S.gamma(num('3001.5')), N.mul(num('3000.5'), S.gamma(num('3000.5'))));
+  assert.equal(N.roundSig(S.gamma(x), 20).digits, '95135076986687318363');
+  assert.throws(() => S.gamma(I(0)), /値がありません/);
+  assert.throws(() => S.gamma(I(-3)), /値がありません/);
+});
+
+test('双曲線関数', () => {
+  exact(S.sinh(I(0)), 0n);
+  exact(S.cosh(I(0)), 1n);
+  exact(S.tanh(I(0)), 0n);
+  for (const t of ['1', '-2.5', '0.001', '20']) {
+    const x = num(t);
+    near(N.sub(N.mul(S.cosh(x), S.cosh(x)), N.mul(S.sinh(x), S.sinh(x))), I(1)); // cosh² − sinh² ＝ 1
+    near(N.div(S.sinh(x), S.cosh(x)), S.tanh(x));
+    near(S.asinh(S.sinh(x)), x);
+  }
+  near(S.sinh(I(1)), N.div(N.sub(S.E, N.div(I(1), S.E)), I(2)));
+  const tiny = num('0.00000000000000000001');
+  near(S.sinh(tiny), N.add(tiny, N.div(N.mul(N.mul(tiny, tiny), tiny), I(6))));
+  near(S.atanh(S.tanh(num('0.5'))), num('0.5'));
+  near(S.acosh(S.cosh(I(3))), I(3));
+  assert.equal(N.roundSig(S.tanh(I(1000)), 50).digits, '1');
+});

@@ -11,7 +11,7 @@
 import * as N from './num.js';
 import * as F from './format.js';
 import * as S from './sci.js';
-import { FN_TOKENS, usesAngle, closeParens, isVar } from './calc.js';
+import { usesAngle, closeParens, isVar } from './calc.js';
 import { pressKey } from './keys.js';
 import { $, renderItems, span, caretFromPoint, toast, tokenText } from './ui.js';
 import { el, button, shake, seg as segOf, setupPad } from './form.js';
@@ -67,7 +67,9 @@ const KINDS = {
 const PLACEHOLDER = { f: '式', a: '数', lo: '数', hi: '数', at: '数' };
 const SIDES = [['both', '両側'], ['right', '右から'], ['left', '左から']];
 const FN_KEY = { sin: 'sin(', cos: 'cos(', tan: 'tan(', ln: 'ln(', log: 'log(' };
-const OK_PARTS = new Set([...'0123456789.+−×÷^()√²!πexk∞', ...Object.keys(FN_TOKENS)]);
+// 微積分で使える部品（ステップ14で増やした関数は、微積分では使わない）
+const CALCULUS_FNS = ['sin(', 'cos(', 'tan(', 'asin(', 'acos(', 'atan(', 'log(', 'ln('];
+const OK_PARTS = new Set([...'0123456789.+−×÷^()√²!πexk∞', ...CALCULUS_FNS]);
 
 const newPer = (kind) => ({ ...structuredClone(KINDS[kind].blank), field: 'f', side: 'both' });
 const st = {

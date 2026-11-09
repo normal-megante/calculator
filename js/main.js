@@ -37,7 +37,7 @@ import {
   initPhys, showPhys, editPhys, checkPhys,
 } from './phys-ui.js';
 
-const VERSION = 'ステップ13（2026-11-09）';
+const VERSION = 'ステップ14（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -148,6 +148,21 @@ function fitExpression(maxPx, minPx) {
   exprEl.style.whiteSpace = '';
 }
 
+// 関数の短い説明（その関数を使ったときだけ、答えの下に出す）
+const FN_NOTES = {
+  logb: 'log(a, x)：a を底にした log（a を何乗すると x になるか）',
+  nroot: 'ⁿ√(n, x)：x の n 乗根（n 回かけると x になる数）',
+  gcd: 'gcd：最大公約数（みんなを割り切る、いちばん大きい数）',
+  lcm: 'lcm：最小公倍数（みんなで割り切れる、いちばん小さい数）',
+  mod: 'mod：あまり（−7 mod 3 ＝ 2。答えは割る数と同じ符号）',
+  dfact: 'n!!：二重階乗 7!! ＝ 7×5×3×1（(n!)! ではありません）',
+  prim: 'n#：素数階乗（n 以下の素数を全部かけたもの）',
+  sf: 'sf(n)：超階乗 1!×2!×…×n!（ほかの決め方の「超階乗」もあります）',
+  hf: 'H(n)：ハイパー階乗 1¹×2²×…×nⁿ',
+  gamma: 'Γ(x)：ガンマ関数。Γ(n) ＝ (n−1)!（整数でない数にも階乗を広げたもの）',
+  hyp: 'sinh・cosh・tanh は双曲線関数（角度のモードは関係ありません）',
+};
+
 function noteLines(notes, form, value) {
   const lines = [];
   for (const note of notes.slice(0, 2)) {
@@ -158,6 +173,8 @@ function noteLines(notes, form, value) {
       lines.push(`％：${base} の ${pct}%（${part}）を${note.op === '+' ? '足しています' : '引いています'}`);
     } else if (note.kind === 'angle') {
       lines.push(`角度は「${S.ANGLE_NAME[note.angle]}」で計算しています${note.angle === 'deg' ? '（360° で1回転）' : '（2π で1回転）'}`);
+    } else if (note.kind === 'fn' && FN_NOTES[note.name]) {
+      lines.push(FN_NOTES[note.name]);
     }
   }
   if (form.frac) {
@@ -277,7 +294,7 @@ function handleKey(key, button) {
     const last = state.last;
     if (isDigit(key) || isFnToken(key) || ['00', '.', '(', '√', 'π', 'e', 'pow10', 'exp'].includes(key)) {
       startEditing([]); // 新しい式
-    } else if (['+', '−', '×', '÷', '^', '%', '²', ')', '!', '⁻¹', 'C', 'P'].includes(key)) {
+    } else if (['+', '−', '×', '÷', '^', '%', '²', ')', '!', '⁻¹', 'C', 'P', 'mod', '!!', '#'].includes(key)) {
       startEditing([answerRef(last.value)]); // 答えの続きから
     } else if (key === 'ans') {
       startEditing([answerRef(last.value)]);
@@ -470,7 +487,7 @@ function setupKeypad() {
   const KEYMAP = {
     Enter: '=', '=': '=', Backspace: 'back', Escape: 'clear', Delete: 'clear',
     ArrowLeft: 'left', ArrowRight: 'right', '*': '×', '/': '÷', '-': '−', '+': '+',
-    '^': '^', '(': '(', ')': ')', '%': '%', '.': '.', '!': '!',
+    '^': '^', '(': '(', ')': ')', '%': '%', '.': '.', '!': '!', ',': ',', '#': '#',
   };
   document.addEventListener('keydown', (event) => {
     if (currentMode() !== 'calc') return;

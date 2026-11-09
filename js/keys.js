@@ -5,16 +5,33 @@
 // pressKey(state, key) は新しい state を返す。押せないキーなら null を返す。
 //
 // カーソルは式の途中にも置けるので、途中の数字を消したり足したりできる。
+// ステップ14：「!」のすぐ後ろの「!」は「!!」（二重階乗）にする。
+//             「,」は log( ⁿ√( gcd( lcm( の中で、数のすぐ後ろだけ。
 // =========================================================
-import { isDigit, isRef, isVar, openParens, BINARY_OPS, isFnToken } from './calc.js';
+import { isDigit, isRef, isVar, openParens, BINARY_OPS, isFnToken, isOpen } from './calc.js';
 
 const isBinary = (t) => typeof t === 'string' && BINARY_OPS.includes(t);
 const isNumberPart = (t) => isDigit(t) || t === '.';
 // 「数の終わり」として後ろに演算子や % をつけられるもの
 const endsValue = (t) => isDigit(t) || t === '.' || t === ')' || t === '%' || t === '²'
-  || t === '!' || t === '⁻¹' || t === 'π' || t === 'e' || isVar(t) || isRef(t);
-// そのすぐ後ろに演算子をつけられないもの（「(」や関数の頭）
-const opensGroup = (t) => t === '(' || t === '√' || isFnToken(t);
+  || t === '!' || t === '!!' || t === '#' || t === '⁻¹' || t === 'π' || t === 'e' || isVar(t) || isRef(t);
+// そのすぐ後ろに演算子をつけられないもの（「(」や関数の頭、「,」）
+const opensGroup = (t) => t === '(' || t === '√' || t === ',' || isFnToken(t);
+// 「,」で数を区切れる関数
+const COMMA_FNS = ['log(', 'root(', 'gcd(', 'lcm('];
+
+// カーソルの左で、まだ閉じていない いちばん内側の「(」や関数（なければ null）
+function innermostOpen(items, caret) {
+  let depth = 0;
+  for (let i = caret - 1; i >= 0; i--) {
+    if (items[i] === ')') depth++;
+    else if (isOpen(items[i])) {
+      if (depth === 0) return items[i];
+      depth--;
+    }
+  }
+  return null;
+}
 
 // カーソルのところにある数（数字と小数点のかたまり）の範囲
 function numberRunAround(items, caret) {
@@ -72,7 +89,8 @@ export function pressKey(state, key) {
     case '÷':
     case '^':
     case 'C':
-    case 'P': {
+    case 'P':
+    case 'mod': {
       if (caret === 0) return null;
       if (opensGroup(prev)) return null;
       if (isBinary(prev)) {
@@ -88,12 +106,23 @@ export function pressKey(state, key) {
       if (prev === '+' || prev === '−') return replaceBefore(state, 1, ['−']);
       return insert(state, ['−']);
     }
+    case '!':
+      // 5! のあとの ! は 5!!（二重階乗）。5!! のあとは打てない（(5!)! は ( ) を使う）
+      if (prev === '!') return replaceBefore(state, 1, ['!!']);
+      if (prev === '!!') return null;
+      if (!endsValue(prev)) return null;
+      return insert(state, [key]);
     case '%':
     case '²':
-    case '!':
+    case '!!':
+    case '#':
     case '⁻¹':
       if (!endsValue(prev)) return null;
       return insert(state, [key]);
+    case ',':
+      if (!endsValue(prev)) return null;
+      if (!COMMA_FNS.includes(innermostOpen(items, caret))) return null;
+      return insert(state, [',']);
     case '√':
     case '(':
     case 'π':

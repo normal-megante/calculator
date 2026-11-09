@@ -129,3 +129,46 @@ test('逆算：log・ln・!・nCr・nPr・x⁻¹', () => {
   assert.equal(lastRev(['1', '0', '^', '(', '6', '0', ')', 'C', '1', '9', '9', '9']).ok, true);
   assert.equal(lastRev(['1', '0', '^', '(', '6', '0', ')', 'P', '1', '9', '9', '9']).ok, true);
 });
+
+// ---- ステップ14：関数を増やす ----
+test('逆算：ステップ14の関数', () => {
+  const lb = lastRev(['log(', '2', ',', '8']);
+  assert.equal(`${lb.op} ${t(lb.value)} ${lb.ok}`, 'logb 8 true');        // 2³ ＝ 8
+  assert.equal(lastRev(['log(', '3', ',', '1', '0']).ok, true);
+  const nr = lastRev(['root(', '3', ',', '−', '8']);
+  assert.equal(`${nr.op} ${t(nr.value)} ${nr.ok}`, 'nroot −8 true');      // (−2)³ ＝ −8
+  assert.equal(lastRev(['root(', '5', ',', '2']).ok, true);
+  const g = lastRev(['gcd(', '1', '2', ',', '1', '8']);
+  assert.equal(`${g.quotients.map(t).join(',')} ${g.ok}`, '2,3 true');
+  const l = lastRev(['lcm(', '4', ',', '6']);
+  assert.equal(`${l.quotients.map(t).join(',')} ${l.ok}`, '3,2 true');
+  assert.match(lastRev(['lcm(', '0', ',', '6']).none, /0/);
+  const m = lastRev(['−', '7', 'mod', '3']);
+  assert.equal(`${t(m.q)} ${t(m.value)} ${m.ok}`, '−3 −7 true');          // 3 × (−3) ＋ 2 ＝ −7
+  const d = lastRev(['8', '!!']);
+  assert.equal(`${t(d.value)} ${t(d.expect)} ${d.ok}`, '48 48 true');     // 384 ÷ 8 ＝ 48 ＝ 6!!
+  assert.match(lastRev(['1', '!!']).none, /1 ときまって/);
+  const pr = lastRev(['1', '0', '#']);
+  assert.equal(`${t(pr.p)} ${t(pr.value)} ${pr.ok}`, '7 30 true');        // 210 ÷ 7 ＝ 30 ＝ 6#
+  const sf = lastRev(['sf(', '4']);
+  assert.equal(`${t(sf.value)} ${sf.ok}`, '12 true');                     // 288 ÷ 4! ＝ 12 ＝ sf(3)
+  const hf = lastRev(['hf(', '3']);
+  assert.equal(`${t(hf.value)} ${hf.ok}`, '4 true');                      // 108 ÷ 3³ ＝ 4 ＝ H(2)
+  assert.equal(lastRev(['Γ(', '0', '.', '5']).ok, true);
+  assert.equal(lastRev(['Γ(', '−', '1', '.', '5']).ok, true);
+  assert.equal(lastRev(['Γ(', '6']).ok, true);
+  assert.equal(lastRev(['sinh(', '2']).ok, true);
+  const ch = lastRev(['cosh(', '−', '2']);
+  assert.equal(`${ch.ok} ${ch.minus}`, 'true true');                      // cosh⁻¹ は 2 を出す
+  assert.equal(lastRev(['tanh(', '0', '.', '5']).ok, true);
+  assert.equal(lastRev(['tanh(', '3', '0']).ok, true);
+  assert.match(lastRev(['tanh(', '5', '0', '0']).none, /±1 に近すぎ/);
+  assert.match(lastRev(['cosh(', '1', '0', '^', '(', '−', '3', '0', ')']).none, /1 に近すぎ/);
+  const ab = lastRev(['abs(', '−', '3']);
+  assert.equal(`${t(ab.value)} ${ab.ok}`, '−3 true');
+  // 大きい数（概数）も確かめられる
+  assert.equal(lastRev(['sf(', '5', '0', '0']).ok, true);
+  assert.equal(lastRev(['hf(', '5', '0', '0']).ok, true);
+  assert.equal(lastRev(['3', '0', '0', '0', '0', '0', '#']).ok, true);
+  assert.equal(lastRev(['2', '0', '0', '0', '0', '1', '!!']).ok, true);
+});

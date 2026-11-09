@@ -44,7 +44,21 @@ function angleEl(value, angle, fromStep = null) {
 
 const FN_TEXT = {
   sin: 'sin', cos: 'cos', tan: 'tan', asin: 'sin⁻¹', acos: 'cos⁻¹', atan: 'tan⁻¹', log: 'log', ln: 'ln',
+  sf: 'sf', hf: 'H', gamma: 'Γ', sinh: 'sinh', cosh: 'cosh', tanh: 'tanh', abs: 'abs',
+  asinh: 'sinh⁻¹', acosh: 'cosh⁻¹', atanh: 'tanh⁻¹',
 };
+
+// 数の並び（gcd(12, 18) の中身）
+function numList(list, froms = []) {
+  const parts = [];
+  list.forEach((v, i) => {
+    if (i) parts.push(', ');
+    parts.push(numEl(v, froms[i] ?? null));
+  });
+  return parts;
+}
+
+const shortText = (x) => F.compact(x).text;
 
 function line(...parts) {
   const p = el('div', 'calc-line');
@@ -85,6 +99,18 @@ function stepLine(s) {
       return line(a, s.op, numEl(s.b, s.bFrom), ' = ', r);
     case '⁻¹':
       return line('1 ÷ ', a, ' = ', r);
+    case 'logb':
+      return line('log(', a, ', ', numEl(s.b, s.bFrom), ') = ', r);
+    case 'nroot':
+      return line('ⁿ√(', a, ', ', numEl(s.b, s.bFrom), ') = ', r);
+    case 'gcd': case 'lcm':
+      return line(`${s.op}(`, ...numList(s.list, s.froms), ') = ', r);
+    case 'mod':
+      return line(a, ' mod ', numEl(s.b, s.bFrom), ' = ', r);
+    case '!!': case '#':
+      return line(a, `${s.op} = `, r);
+    case 'sf': case 'hf': case 'gamma': case 'sinh': case 'cosh': case 'tanh': case 'abs':
+      return line(`${FN_TEXT[s.op]}(`, a, ') = ', r);
     default:
       return line(r);
   }
@@ -139,12 +165,67 @@ function reverseLine(rev) {
       body = [x, ' ÷ ', numEl(rev.n), ' = ', v, rev.ok ? ` ＝ ${npr}` : ` ≠ ${npr}`];
       break;
     }
+    // ---- ステップ14 ----
+    case 'logb':
+      body = [numEl(rev.base), ' ^ ', x, ' = ', v]; break;
+    case 'nroot':
+      body = [x, ' ^ ', numEl(rev.n), ' = ', v]; break;
+    case 'gcd': case 'lcm': {
+      body = [];
+      rev.list.forEach((n, i) => {
+        if (i) body.push('、');
+        if (rev.op === 'gcd') body.push(numEl(n), ' ÷ ', numEl(rev.x), ' = ', numEl(rev.quotients[i]));
+        else body.push(numEl(rev.x), ' ÷ ', numEl(n), ' = ', numEl(rev.quotients[i]));
+      });
+      break;
+    }
+    case 'mod':
+      body = [numEl(rev.y), ' × ', numEl(rev.q), ' + ', x, ' = ', v]; break;
+    case 'dfact': {
+      const k = `${shortText(rev.k)}!!`;
+      body = [x, ' ÷ ', numEl(rev.y), ' = ', v, rev.ok ? ` ＝ ${k}` : ` ≠ ${k}`];
+      break;
+    }
+    case 'prim': {
+      const k = `${shortText(rev.k)}#`;
+      body = [x, ' ÷ ', numEl(rev.p), ' = ', v, rev.ok ? ` ＝ ${k}` : ` ≠ ${k}`];
+      break;
+    }
+    case 'sf': {
+      const k = `sf(${shortText(rev.k)})`;
+      body = [x, ` ÷ ${factText(rev.n)} = `, v, rev.ok ? ` ＝ ${k}` : ` ≠ ${k}`];
+      break;
+    }
+    case 'hf': {
+      const n = shortText(rev.n);
+      const k = `H(${shortText(rev.k)})`;
+      body = [x, ` ÷ ${n}${S.supText(S.intOf(rev.n))} = `, v, rev.ok ? ` ＝ ${k}` : ` ≠ ${k}`];
+      break;
+    }
+    case 'gamma':
+      body = ['Γ(', numEl(rev.a1), ') ÷ ', numEl(rev.a), ' = ', v]; break;
+    case 'asinh': case 'acosh': case 'atanh':
+      body = [`${FN_TEXT[rev.op]} `, x, ' = ', v]; break;
+    case 'abs':
+      body = ['±', x, ' のうち ', v]; break;
     default:
       body = [v];
   }
   const p = line('逆算：', ...body);
   p.classList.add('rev');
   p.append(el('span', rev.ok ? 'mark ok' : 'mark ng', rev.ok ? ' ✓' : ' ✗'));
+  // ステップ14の関数の、ひとこと
+  const note = (text) => p.append(el('span', 'rev-note', text));
+  if (rev.op === 'gcd' || rev.op === 'lcm') {
+    const qs = rev.quotients.map(shortText).join('・');
+    note(rev.ok
+      ? `（${qs} は 1 のほかに、みんなを割り切る数がない）`
+      : `（${qs} に割り切れない数があるか、まだみんなを割り切る数がある）`);
+  }
+  if (rev.op === 'prim') note(`（${shortText(rev.p)} は ${shortText(rev.n)} 以下でいちばん大きい素数）`);
+  if (rev.op === 'gamma') note('（Γ(x＋1) ＝ x × Γ(x) を使っています）');
+  if (rev.minus) note(`（cosh は −x でも同じ値なので、cosh⁻¹ は 0 以上の ${shortText(rev.expect)} を出します）`);
+  if (rev.digits && rev.digits < 60) note(`（答えが 1 に近いので、上から ${rev.digits} 桁でくらべています）`);
   // sin⁻¹ などは決まった範囲の角度を出すので、もとの角度とちがうことがある
   if (rev.ok && rev.same === false) {
     const deg = rev.angle === 'deg' ? '°' : '';

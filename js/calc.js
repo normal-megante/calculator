@@ -5,6 +5,8 @@
 //   ・1文字の文字列 … '0'〜'9' '.' '+' '−' '×' '÷' '^' '(' ')' '%' '²' '√'
 //   ・関数電卓の部品 … 'sin(' などの関数（「(」もかねる）、'π' 'e'、'!' '⁻¹'（後ろにつく）、
 //                       'C' 'P'（nCr・nPr）
+//                       ステップ14：'sinh(' 'gcd(' などの関数、','（log(2, 8) などの区切り）、
+//                       'mod'（あまり。× ÷ と同じ順番）、'!!'（二重階乗）'#'（素数階乗）（後ろにつく）
 //   ・{ ref: 数, label: 表示名 } … 前の答えや履歴の答え（全部の桁を持ったまま式に入る）
 //   ・'x' 'k' … 変数（微分・積分・Σ・lim の式。compile で木にして evalTree で x の値を入れて計算）
 //
@@ -19,6 +21,8 @@
 //   ・関数：sin( などは閉じていなければ ＝ で閉じる。2sin(30) や 2π は かけ算。
 //   ・nCr・nPr は × ÷ より先、累乗・! より後：2×5C2 = 20
 //   ・sin cos tan は、そのときの角度のモード（度・rad）で計算する（evaluate の angle）
+//   ・「,」で数を区切る関数：log(底, 数)・ⁿ√(n, 数)・gcd(a, b, …)・lcm(a, b, …)
+//   ・mod は × ÷ と同じ順番：2×7 mod 4 ＝ (2×7) mod 4 ＝ 2
 // =========================================================
 import * as N from './num.js';
 import * as S from './sci.js';
@@ -33,15 +37,29 @@ export function normalizeChar(ch) {
   return ALIASES[ch] ?? ch;
 }
 
-export const BINARY_OPS = ['+', '−', '×', '÷', '^', 'C', 'P'];
+export const BINARY_OPS = ['+', '−', '×', '÷', '^', 'C', 'P', 'mod'];
 
 // 関数の部品 → 名前
 export const FN_TOKENS = {
   'sin(': 'sin', 'cos(': 'cos', 'tan(': 'tan',
   'asin(': 'asin', 'acos(': 'acos', 'atan(': 'atan',
   'log(': 'log', 'ln(': 'ln',
+  'sinh(': 'sinh', 'cosh(': 'cosh', 'tanh(': 'tanh', 'abs(': 'abs', 'Γ(': 'gamma',
+  'sf(': 'sf', 'hf(': 'hf', 'root(': 'root', 'gcd(': 'gcd', 'lcm(': 'lcm',
 };
 export const TRIG = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan'];
+const HYPERBOLIC = ['sinh', 'cosh', 'tanh'];
+
+// 「,」で区切って入れる数の個数 [少なくとも, 多くても]（ほかの関数は 1 個だけ）
+const ARITY = { log: [1, 2], root: [2, 2], gcd: [2, Infinity], lcm: [2, Infinity] };
+const ARITY_HINT = {
+  log: 'log は log(数) か、底を変えるときは log(底, 数) です（例：log(2, 8) ＝ 3）',
+  root: 'ⁿ√ は ⁿ√(n, 数) のように、n と数を「,」で区切って打ちます（例：ⁿ√(3, 8) ＝ 2）',
+  gcd: 'gcd は gcd(12, 18) のように、2つ以上の数を「,」で区切って打ちます',
+  lcm: 'lcm は lcm(4, 6) のように、2つ以上の数を「,」で区切って打ちます',
+};
+const FN_SHOW = { root: 'ⁿ√', hf: 'H', gamma: 'Γ', asin: 'sin⁻¹', acos: 'cos⁻¹', atan: 'tan⁻¹' };
+const COMMA_ONLY_IN = '「,」は log( ⁿ√( gcd( lcm( の中で、数を区切るときだけ使えます';
 
 export const isFnToken = (t) => typeof t === 'string' && Object.hasOwn(FN_TOKENS, t);
 // 「(」として数えるもの
@@ -102,8 +120,9 @@ export function lex(items) {
       continue;
     }
     const type = {
-      '+': 'op', '−': 'op', '×': 'op', '÷': 'op', '^': 'op', 'C': 'op', 'P': 'op',
+      '+': 'op', '−': 'op', '×': 'op', '÷': 'op', '^': 'op', 'C': 'op', 'P': 'op', 'mod': 'op',
       '(': 'lp', ')': 'rp', '%': 'pct', '²': 'sq', '√': 'sqrt', '!': 'fact', '⁻¹': 'inv',
+      '!!': 'dfact', '#': 'prim', ',': 'comma',
     }[ch];
     if (!type) throw new CalcError(`使えない文字があります：${ch}`, 'syntax');
     out.push({ type, value: ch, at: i });
@@ -131,6 +150,7 @@ class Parser {
     const rest = this.peek();
     if (rest) {
       if (rest.type === 'rp') throw new CalcError('「)」が多すぎます', 'syntax');
+      if (rest.type === 'comma') throw new CalcError(COMMA_ONLY_IN, 'syntax');
       throw new CalcError('式の形が正しくありません', 'syntax');
     }
     return node;
@@ -150,7 +170,7 @@ class Parser {
     }
   }
 
-  // × ÷（記号を省いたかけ算も）
+  // × ÷ mod（記号を省いたかけ算も）
   term() {
     let a = this.perm();
     for (;;) {
@@ -158,6 +178,9 @@ class Parser {
       if (t?.type === 'op' && (t.value === '×' || t.value === '÷')) {
         this.i++;
         a = { t: 'mul', op: t.value, a, b: this.perm() };
+      } else if (t?.type === 'op' && t.value === 'mod') {
+        this.i++;
+        a = { t: 'mod', a, b: this.perm() };
       } else if (t && (t.type === 'num' || t.type === 'lp' || t.type === 'sqrt' || t.type === 'fn' || t.type === 'var')) {
         a = { t: 'mul', op: '·', a, b: this.power() };
       } else {
@@ -202,7 +225,7 @@ class Parser {
     return base;
   }
 
-  // 後ろにつく % ² ! ⁻¹
+  // 後ろにつく % ² ! ⁻¹ !! #
   postfix() {
     let a = this.primary();
     for (;;) {
@@ -211,6 +234,8 @@ class Parser {
       else if (t?.type === 'sq') { this.i++; a = { t: 'sq', a }; }
       else if (t?.type === 'fact') { this.i++; a = { t: 'fact', a }; }
       else if (t?.type === 'inv') { this.i++; a = { t: 'inv', a }; }
+      else if (t?.type === 'dfact') { this.i++; a = { t: 'dfact', a }; }
+      else if (t?.type === 'prim') { this.i++; a = { t: 'prim', a }; }
       else return a;
     }
   }
@@ -228,18 +253,31 @@ class Parser {
         const a = this.sum();
         const close = this.tokens[this.i++];
         if (!close) throw new CalcError('「)」が足りません', 'incomplete');
+        if (close.type === 'comma') throw new CalcError(COMMA_ONLY_IN, 'syntax');
         if (close.type !== 'rp') throw new CalcError('式の形が正しくありません', 'syntax');
         return { t: 'group', a };
       }
       case 'sqrt':
         return { t: 'sqrt', a: this.unary() };
       case 'fn': {
-        if (this.peek()?.type === 'rp') throw new CalcError(`${t.value}) の中が空です`, 'syntax');
-        const a = this.sum();
+        const show = FN_SHOW[t.name] ?? t.name;
+        if (this.peek()?.type === 'rp') throw new CalcError(`${show}( ) の中が空です`, 'syntax');
+        // 「,」で区切った数（log(2, 8) など）
+        const args = [this.sum()];
+        while (this.peek()?.type === 'comma') {
+          this.i++;
+          const next = this.peek();
+          if (!next || next.type === 'rp' || next.type === 'comma') throw new CalcError('「,」のあとに数がありません', 'incomplete');
+          args.push(this.sum());
+        }
         const close = this.tokens[this.i++];
         if (!close) throw new CalcError('「)」が足りません', 'incomplete');
         if (close.type !== 'rp') throw new CalcError('式の形が正しくありません', 'syntax');
-        return { t: 'fn', name: t.name, a };
+        const [min, max] = ARITY[t.name] ?? [1, 1];
+        if (args.length < min || args.length > max) {
+          throw new CalcError(ARITY_HINT[t.name] ?? `${show}( の中には、数を1つだけ入れます（「,」は使えません）`, 'syntax');
+        }
+        return { t: 'fn', name: t.name, a: args[0], args };
       }
       case 'op':
         throw new CalcError(`「${t.value}」の前に数がありません`, 'syntax');
@@ -262,6 +300,8 @@ export function parse(tokens) {
 //   { op, a, b, result, aFrom, bFrom }
 //   op    : '+' '−' '×' '÷' '^' '²' '√' '%' 'neg' 'pct+' 'pct−'
 //           関数電卓：'sin' 'cos' 'tan' 'asin' 'acos' 'atan'（angle も記録）'log' 'ln' '!' '⁻¹' 'C' 'P'
+//           ステップ14：'logb'（a ＝ 底, b ＝ 数）'nroot'（a ＝ n, b ＝ 数）'gcd' 'lcm'（list ＝ 数の並び）
+//                       'mod'（q ＝ 商）'!!' '#' 'sf' 'hf' 'gamma' 'sinh' 'cosh' 'tanh' 'abs'
 //   aFrom : a が前のステップの答えなら、そのステップの番号（数をそのまま打ったなら null）
 // ---------------------------------------------------------
 function record(ctx, node, step) {
@@ -271,6 +311,34 @@ function record(ctx, node, step) {
 }
 
 const from = (node) => node.step ?? null;
+
+// 関数の注意書き（同じものは1回だけ。画面の文は main.js）
+function fnNote(ctx, name) {
+  if (!ctx.notes.some((n) => n.kind === 'fn' && n.name === name)) ctx.notes.push({ kind: 'fn', name });
+}
+
+// 「,」で区切った数の関数
+function evaluateMulti(node, ctx) {
+  const list = node.args.map((arg) => evaluateNode(arg, ctx));
+  const froms = node.args.map(from);
+  const step = { a: list[0], b: list[1], aFrom: froms[0], bFrom: froms[1] };
+  switch (node.name) {
+    case 'log':
+      fnNote(ctx, 'logb');
+      return record(ctx, node, { op: 'logb', ...step, result: S.logb(list[0], list[1]) });
+    case 'root':
+      fnNote(ctx, 'nroot');
+      return record(ctx, node, { op: 'nroot', ...step, result: S.root(list[0], list[1]) });
+    case 'gcd':
+    case 'lcm':
+      fnNote(ctx, node.name);
+      return record(ctx, node, {
+        op: node.name, ...step, list, froms, result: node.name === 'gcd' ? S.gcdOf(list) : S.lcmOf(list),
+      });
+    default:
+      throw new Error(`知らない関数: ${node.name}`);
+  }
+}
 
 function evaluateNode(node, ctx) {
   switch (node.t) {
@@ -332,12 +400,15 @@ function evaluateNode(node, ctx) {
       return record(ctx, node, { op: '√', a, result: N.sqrt(a), aFrom: from(node.a) });
     }
     case 'fn': {
+      if (node.args?.length > 1) return evaluateMulti(node, ctx);
       const a = evaluateNode(node.a, ctx);
       const step = { op: node.name, a, aFrom: from(node.a) };
       if (TRIG.includes(node.name)) {
         step.angle = ctx.angle;
         if (!ctx.notes.some((n) => n.kind === 'angle')) ctx.notes.push({ kind: 'angle', angle: ctx.angle });
       }
+      if (HYPERBOLIC.includes(node.name)) fnNote(ctx, 'hyp');
+      else if (['sf', 'hf', 'gamma'].includes(node.name)) fnNote(ctx, node.name);
       step.result = applyFn(node.name, a, ctx.angle);
       return record(ctx, node, step);
     }
@@ -348,6 +419,23 @@ function evaluateNode(node, ctx) {
     case 'inv': {
       const a = evaluateNode(node.a, ctx);
       return record(ctx, node, { op: '⁻¹', a, result: S.reciprocal(a), aFrom: from(node.a) });
+    }
+    case 'dfact': {
+      const a = evaluateNode(node.a, ctx);
+      fnNote(ctx, 'dfact');
+      return record(ctx, node, { op: '!!', a, result: S.doubleFactorial(a), aFrom: from(node.a) });
+    }
+    case 'prim': {
+      const a = evaluateNode(node.a, ctx);
+      fnNote(ctx, 'prim');
+      return record(ctx, node, { op: '#', a, result: S.primorial(a), aFrom: from(node.a) });
+    }
+    case 'mod': {
+      const a = evaluateNode(node.a, ctx);
+      const b = evaluateNode(node.b, ctx);
+      const { q, r } = S.mod(a, b);
+      fnNote(ctx, 'mod');
+      return record(ctx, node, { op: 'mod', a, b, q, result: r, aFrom: from(node.a), bFrom: from(node.b) });
     }
     case 'perm': {
       const a = evaluateNode(node.a, ctx);
@@ -370,6 +458,13 @@ function applyFn(name, a, angle) {
     case 'atan': return S.atan(a, angle);
     case 'log': return S.log10(a);
     case 'ln': return S.ln(a);
+    case 'sinh': return S.sinh(a);
+    case 'cosh': return S.cosh(a);
+    case 'tanh': return S.tanh(a);
+    case 'abs': return S.abs(a);
+    case 'gamma': return S.gamma(a);
+    case 'sf': return S.superfactorial(a);
+    case 'hf': return S.hyperfactorial(a);
     default: throw new Error(`知らない関数: ${name}`);
   }
 }
@@ -425,6 +520,8 @@ export function preview(items, { angle = S.getAngle() } = {}) {
   } catch {
     return null;
   }
+  // 「log(2,」のように「,」で終わっているときは、まだ答えを出さない（log 2 とまちがえないように）
+  if (tokens.length && tokens[tokens.length - 1].type === 'comma') return null;
   while (tokens.length && ['op', 'lp', 'sqrt', 'fn'].includes(tokens[tokens.length - 1].type)) tokens.pop();
   if (tokens.length === 0) return null;
   // 数を1つ打っただけなら、答えを出すまでもない（前の答えなどの部品1つ・π・e は出す）
