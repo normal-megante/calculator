@@ -27,6 +27,7 @@
         <button type="button" role="tab" data-mode="base" aria-selected="false">n進法</button>
         <button type="button" role="tab" data-mode="complex" aria-selected="false">複素数</button>
         <button type="button" role="tab" data-mode="phys" aria-selected="false">公式</button>
+        <button type="button" role="tab" data-mode="big" aria-selected="false">巨大数</button>
       </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
@@ -771,6 +772,49 @@
         <button type="button" data-k="=" class="k eq" aria-label="履歴に残す">=</button>
       </section>
     </div>
+
+    <!-- 巨大数 -->
+    <div class="view bn" id="bigView" hidden>
+      <div class="subtabs u-cats bn-kinds" id="bnKinds" role="tablist" aria-label="巨大数の種類"></div>
+      <div class="shop-pane bn-pane">
+        <section class="shop-sum bn-card" id="bnCard" aria-label="式と答え">
+          <div class="sum-top">
+            <span class="sum-label" id="bnName"></span>
+            <button type="button" class="check-btn" id="btnBnToCalc">電卓で使う</button>
+            <button type="button" class="check-btn" id="btnBnCheck">✓ 検算</button>
+          </div>
+          <div class="bn-show" id="bnShow"></div>
+          <button type="button" class="u-main bn-answer" id="bnAnswer" aria-label="答え（ふつうの数なら、タップでくわしい表示）"></button>
+          <div class="sum-tax bn-sub" id="bnSub"></div>
+          <div class="ph-notes bn-notes" id="bnNotes"></div>
+        </section>
+        <ol class="bn-famous" id="bnFamous" hidden aria-label="有名な巨大数"></ol>
+      </div>
+
+      <section class="entry bn-entry" id="bnEntry" aria-label="数を打つ欄">
+        <div class="bn-fields" id="bnFields"></div>
+        <p class="entry-hint"><span id="bnHint"></span></p>
+      </section>
+
+      <section class="shop-keys bn-keys" id="bnKeys" aria-label="巨大数のキー">
+        <button type="button" data-k="7" class="k num">7</button>
+        <button type="button" data-k="8" class="k num">8</button>
+        <button type="button" data-k="9" class="k num">9</button>
+        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+        <button type="button" data-k="4" class="k num">4</button>
+        <button type="button" data-k="5" class="k num">5</button>
+        <button type="button" data-k="6" class="k num">6</button>
+        <button type="button" data-k="clear" class="k fn danger" aria-label="この欄の数を消す">C</button>
+        <button type="button" data-k="1" class="k num">1</button>
+        <button type="button" data-k="2" class="k num">2</button>
+        <button type="button" data-k="3" class="k num">3</button>
+        <button type="button" data-k="^" class="k op" aria-label="累乗（10^100 のように）">^</button>
+        <button type="button" data-k="0" class="k num">0</button>
+        <button type="button" data-k="." class="k num">.</button>
+        <button type="button" data-k="up2" class="k op" aria-label="テトレーション（3↑↑3 のように）">↑↑</button>
+        <button type="button" data-k="next" class="k fn small" aria-label="次の欄へ">次へ</button>
+      </section>
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -1083,6 +1127,16 @@
         <li>単位は、えらんだ欄の下のボタンで変えられます（mA・kΩ・km/h など）。計算の前に、公式の単位（A・Ω・m/s など）に分数のまま直すので、誤差は出ません。</li>
         <li>重力加速度 g（9.8）・水の比熱（4.2）・電気の単価（31円/kWh）などは、はじめから入っています。ちがう数にしたいときは打ちかえます。</li>
         <li>「✓ 検算」は、公式を求める形に変形 → 単位をそろえる → 数を入れて計算 → 答えを元の公式に入れて、左と右が同じになるか（逆算）、の順に見せます。</li>
+      </ul>
+      <h3>巨大数</h3>
+      <ul>
+        <li>上の「巨大数」で、ふつうの電卓では出せない大きさの数を計算します。答えは 10^10^19727.78 のような「10 の累乗の塔」の形や、10↑↑(…) の形で出します。</li>
+        <li><b>テトレーション</b> a↑↑n：a を n 段つんだ累乗の塔。上から計算します（3↑↑3 ＝ 3^(3^3) ＝ 3^27 ＝ 7,625,597,484,987）。<b>スーパー対数</b> slogₐx：a を何段つむと x になるか（テトレーションの逆）。</li>
+        <li><b>矢印表記</b>（クヌースの矢印）：↑ が1個は累乗、2個はテトレーション、3個は「↑↑ をくり返す」…と、↑ が1つふえるごとに1段上のくり返しになります（3↑↑↑3 ＝ 3↑↑(3↑↑3)）。</li>
+        <li><b>アッカーマン関数</b> A(m, n)：A(0, n) ＝ n＋1、A(m, 0) ＝ A(m−1, 1)、A(m, n) ＝ A(m−1, A(m, n−1)) で決まる、とても速く大きくなる関数。A(4, 2) は 19,729 桁です。</li>
+        <li>欄には <b>^</b> と <b>↑↑</b> のキーで 10^100 や 3↑↑3 のようにも打てます（右から計算します）。<b>有名な数</b>：グーゴル・グーゴルプレックス・スキューズ数・グラハム数 など。</li>
+        <li>塔がとても高くなると、上の数字はもう変わりません（10^10^x に何をかけても、x の上の桁は同じ）。だから、高い塔は「段の数」を数えて出します。整数でない高さとスーパー対数は「線形近似」で決めています（ほかの決め方もあります）。</li>
+        <li>「✓ 検算」は、上から1段ずつ計算した途中の数と、答えからもどす逆算（log を何回とると 1 以下になるか など）を見せます。グラハム数や 3↑↑↑↑3 は、この電卓でも表せません。</li>
       </ul>
       <p class="hint">履歴やいまの式、お買い物の品物、割り勘・時給の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>

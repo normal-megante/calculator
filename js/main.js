@@ -36,8 +36,9 @@ import {
 import {
   initPhys, showPhys, editPhys, checkPhys,
 } from './phys-ui.js';
+import { initBig, showBig } from './big-ui.js';
 
-const VERSION = 'ステップ14（2026-11-09）';
+const VERSION = 'ステップ15（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -384,7 +385,7 @@ function equals(button) {
 // ---------------------------------------------------------
 const VIEWS = {
   calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView', unit: '#unitView',
-  calculus: '#calculusView', base: '#baseView', complex: '#complexView', phys: '#physView',
+  calculus: '#calculusView', base: '#baseView', complex: '#complexView', phys: '#physView', big: '#bigView',
 };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
@@ -415,7 +416,8 @@ function applyMode() {
   else if (mode === 'calculus') showCalculus();
   else if (mode === 'base') showBase();
   else if (mode === 'complex') showComplex();
-  else showPhys();
+  else if (mode === 'phys') showPhys();
+  else showBig();
 }
 
 // ---------------------------------------------------------
@@ -759,6 +761,15 @@ function start() {
       addHistory(items, value, meta);
     },
     // 公式の答えを電卓の式に入れる
+    onUseInCalc(value, label) {
+      useInCalc(value, label);
+      toast('答えを電卓の式に入れました');
+    },
+  });
+  initBig({
+    settings: () => settings,
+    active: () => currentMode() === 'big',
+    // 巨大数の答え（ふつうの数のときだけ）を電卓の式に入れる
     onUseInCalc(value, label) {
       useInCalc(value, label);
       toast('答えを電卓の式に入れました');
