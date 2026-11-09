@@ -293,7 +293,7 @@ export function div(a, b, p = P) {
 
 export function sqrt(a, p = P) {
   const s = sign(a);
-  if (s < 0) throw new CalcError('負の数の √ は、いまは計算できません');
+  if (s < 0) throw new CalcError('負の数の √ はふつうの数になりません（上の「複素数」なら計算できます）');
   if (s === 0) return ZERO;
   if (a.q) {
     // 4/9 のように、分子も分母も「ある数の2乗」なら正確に
@@ -320,7 +320,7 @@ export function pow(a, b, p = P) {
   if (b.q) {
     // 分数の累乗 a^(n/d)。d 乗根をとってから n 乗する
     if (sa < 0 && b.d % 2n === 0n) {
-      throw new CalcError('負の数のこの累乗（偶数乗根）は、いまは計算できません');
+      throw new CalcError('負の数のこの累乗（偶数乗根）はふつうの数になりません（「複素数」なら計算できます）');
     }
     if (a.q && b.d <= 64n) {
       const k = Number(b.d);
@@ -334,7 +334,7 @@ export function pow(a, b, p = P) {
     const r = powReal(absNum(a), b, p);
     return sa < 0 && b.n % 2n !== 0n ? neg(r) : r;
   }
-  if (sa < 0) throw new CalcError('負の数の、小数での累乗は計算できません');
+  if (sa < 0) throw new CalcError('負の数の小数乗はふつうの数になりません（「複素数」なら計算できます）');
   return powReal(a, b, p);
 }
 

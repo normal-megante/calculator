@@ -1230,3 +1230,37 @@ button.ghost.mini { min-height: 34px; padding: 0 12px; font-size: 13px; }
 .bs-conv { margin: 2px 0 8px; }
 .bs-conv summary { padding: 6px 0; font-size: 15px; font-weight: 600; cursor: pointer; word-break: break-all; }
 .bs-conv .calc-line { font-size: 15px; }
+
+/* =========================================================
+   複素数
+   ========================================================= */
+.cx-top { flex: none; display: flex; align-items: center; gap: 8px; margin: 2px 12px 4px; }
+.cx-top-label { font-size: 13px; color: var(--muted); }
+.cx-top .seg button { min-width: 3em; }
+.cx-rule { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+.expr .tk.cx-i { font-style: italic; padding-right: 0.1em; color: var(--accent); }
+.ovl { text-decoration: overline; }
+.expr .tk.konst { font-style: italic; }
+.cx-plane { flex: none; padding: 0 12px 4px; }
+.cx-svg { display: block; width: 100%; max-width: 420px; height: auto; margin: 0 auto; }
+.cx-svg .axis { stroke: var(--muted); stroke-width: 1; }
+.cx-svg .ax-name { fill: var(--muted); font-size: 10px; }
+.cx-svg .tick { fill: var(--muted); font-size: 9.5px; }
+.cx-svg .len { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.5; }
+.cx-svg .helper { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.cx-svg line.op { stroke: var(--muted); stroke-width: 2; }
+.cx-svg line.ans { stroke: var(--accent); stroke-width: 2.6; }
+.cx-svg .op-fill { fill: var(--muted); }
+.cx-svg .ans-fill { fill: var(--accent); }
+.cx-svg .arc { fill: none; stroke: var(--accent); stroke-width: 1.2; }
+.cx-svg text.pt { font-size: 12px; font-weight: 700; }
+.cx-svg text.pt.op { fill: var(--muted); }
+.cx-svg text.pt.ans { fill: var(--accent); }
+.cx-legend { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; font-variant-numeric: tabular-nums; word-break: break-all; }
+.cx-legend p { margin: 0; }
+.cx-legend .op { color: var(--muted); }
+.cx-legend .ans { color: var(--accent); font-weight: 700; }
+.cx-legend .hint { margin: 2px 0 0; }
+.cx-row { grid-template-columns: 4.6em minmax(0, 1fr); }
+.cx-keys .k.eq { grid-column: span 2; }
+.cx-keys .k.cx-ikey { font-style: italic; color: var(--accent); }

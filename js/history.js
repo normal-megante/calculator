@@ -5,11 +5,13 @@
 //   ・1つずつ消せる（すぐなら「元に戻す」）
 //   ・「答えを使う」：答えを全部の桁のまま、いまの式に入れる
 //   ・「式を直す」：その式を電卓に戻して、途中を直せる
+//   ・複素数の履歴（mode: 'complex'）は、式も答えも複素数の形で持つ（value ＝ 実部、im ＝ 虚部）
 // =========================================================
 import * as N from './num.js';
 import * as F from './format.js';
 import * as DB from './db.js';
 import { itemsToText } from './calc.js';
+import * as C from './complex.js';
 import { $, renderItems, serializeItems, deserializeItems, toast, span } from './ui.js';
 import { openDetail } from './detail.js';
 
@@ -28,6 +30,11 @@ let pickedKind = '';
 
 // 履歴1つ分を、画面で使える形に（式と答えを BigInt に戻す）
 function expand(entry) {
+  if (!entry.cache && entry.mode === 'complex') {
+    const items = C.deserItems(entry.items);
+    const z = C.cx(N.deserialize(entry.value), N.deserialize(entry.im));
+    entry.cache = { items, value: z.re, z, text: C.exprText(items), valueText: C.rectText(z, 14) };
+  }
   if (!entry.cache) {
     const items = deserializeItems(entry.items);
     const value = N.deserialize(entry.value);
@@ -86,6 +93,27 @@ export async function addHistory(items, value, { name = '', kind = '', angle = n
     time: Date.now(),
     items: serializeItems(items),
     value: N.serialize(value),
+    name,
+    kind,
+  };
+  if (angle) entry.angle = angle;
+  entries.unshift(entry);
+  try {
+    await store(entry);
+  } catch {
+    toast('履歴を保存できませんでした');
+  }
+}
+
+// 複素数の ＝
+export async function addComplexHistory(items, z, { name = '', kind = '', angle = null } = {}) {
+  const entry = {
+    id: DB.newId(),
+    time: Date.now(),
+    mode: 'complex',
+    items: C.serItems(items),
+    value: N.serialize(z.re),
+    im: N.serialize(z.im),
     name,
     kind,
   };
@@ -189,8 +217,12 @@ function itemEl(entry) {
 
   const value = document.createElement('div');
   value.className = 'h-value';
-  const f = F.compact(c.value, 14, 24);
-  value.innerHTML = `= ${f.html}`;
+  if (c.z) {
+    value.textContent = `= ${c.valueText}`;
+  } else {
+    const f = F.compact(c.value, 14, 24);
+    value.innerHTML = `= ${f.html}`;
+  }
 
   const actions = document.createElement('div');
   actions.className = 'h-actions';
@@ -208,6 +240,7 @@ function itemEl(entry) {
     b.dataset.act = act;
     b.textContent = label;
     if (cls) b.className = cls;
+    if (act === 'detail' && c.z) continue; // 複素数は「全部の桁」なし
     actions.append(b);
   }
   li.append(head, expr, value, actions);
@@ -221,6 +254,14 @@ function onListClick(event) {
   if (!entry) return;
   const act = event.target.closest('[data-act]')?.dataset.act;
   const c = expand(entry);
+  // 複素数の履歴は、複素数の画面で
+  if (c.z && ['use', 'edit', 'check'].includes(act)) {
+    if (act === 'use') handlers.onUseComplex(c.z, entry.name || c.valueText);
+    else if (act === 'edit') handlers.onEditComplex(c.items, entry.angle);
+    else handlers.onCheckComplex(c.items, entry.angle);
+    if (act !== 'check') closePanel();
+    return;
+  }
   switch (act) {
     case 'use':
       handlers.onUseAnswer(c.value, entry.name || F.chipLabel(c.value));

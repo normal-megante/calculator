@@ -84,7 +84,7 @@ test('log と ln', () => {
   near(S.ln(S.E), I(1));
   exact(S.ln(I(1)), 0n);
   assert.throws(() => S.log10(N.ZERO), /log はありません/);
-  assert.throws(() => S.ln(I(-1)), /ln はありません/);
+  assert.throws(() => S.ln(I(-1)), /ln はふつうの数になりません/);
 });
 
 test('階乗・nPr・nCr', () => {

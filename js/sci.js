@@ -199,7 +199,7 @@ export function log10(x) {
 }
 
 export function ln(x) {
-  if (N.sign(x) <= 0) throw new CalcError('0 や負の数の ln はありません');
+  if (N.sign(x) <= 0) throw new CalcError('0 や負の数の ln はふつうの数になりません（負の数は「複素数」で計算できます）');
   return N.ln(x);
 }
 

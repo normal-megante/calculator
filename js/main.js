@@ -17,7 +17,7 @@ import {
   $, renderItems, span, caretFromPoint, serializeItems, deserializeItems,
   toast, loadSettings, saveSettings, buzz, setupDialogClose,
 } from './ui.js';
-import { initHistory, addHistory, closeHistory } from './history.js';
+import { initHistory, addHistory, addComplexHistory, closeHistory } from './history.js';
 import { openDetail } from './detail.js';
 import { liveCompare, fullCompare } from './check.js';
 import { openCheck, openVerifyResult } from './check-ui.js';
@@ -30,8 +30,11 @@ import { initUnit, showUnit } from './unit-ui.js';
 import { initSci } from './sci-ui.js';
 import { initCalculus, showCalculus } from './calculus-ui.js';
 import { initBase, showBase } from './base-ui.js';
+import {
+  initComplex, showComplex, useComplexAnswer, editComplex, checkComplex,
+} from './complex-ui.js';
 
-const VERSION = 'ステップ10（2026-11-09）';
+const VERSION = 'ステップ11（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -361,7 +364,7 @@ function equals(button) {
 // ---------------------------------------------------------
 const VIEWS = {
   calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView', unit: '#unitView',
-  calculus: '#calculusView', base: '#baseView',
+  calculus: '#calculusView', base: '#baseView', complex: '#complexView',
 };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
@@ -390,7 +393,8 @@ function applyMode() {
   else if (mode === 'date') showDate();
   else if (mode === 'unit') showUnit();
   else if (mode === 'calculus') showCalculus();
-  else showBase();
+  else if (mode === 'base') showBase();
+  else showComplex();
 }
 
 // ---------------------------------------------------------
@@ -619,6 +623,18 @@ function start() {
     onCheck(items, value, name, angle) {
       showCheck(items, value, name, angle);
     },
+    // 複素数の履歴：答えを使う・式を直す・検算（複素数の画面で）
+    onUseComplex(z, label) {
+      useComplexAnswer(z, label);
+      setMode('complex');
+    },
+    onEditComplex(items, angle) {
+      editComplex(items, angle);
+      setMode('complex');
+    },
+    onCheckComplex(items, angle) {
+      checkComplex(items, angle);
+    },
   });
   initShop({
     settings: () => settings,
@@ -691,6 +707,19 @@ function start() {
     onUseInCalc(value, label) {
       useInCalc(value, label);
       toast('答えを電卓の式に入れました（10進の数として）');
+    },
+  });
+  initComplex({
+    settings: () => settings,
+    active: () => currentMode() === 'complex',
+    // 複素数の ＝
+    onSaveHistory(items, z, meta) {
+      addComplexHistory(items, z, meta);
+    },
+    // 答え（i のない数のときだけ）を電卓の式に入れる
+    onUseInCalc(value) {
+      useInCalc(value);
+      toast('答えを電卓の式に入れました');
     },
   });
   applyMode();
