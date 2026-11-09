@@ -3,6 +3,7 @@
 //
 //   合計を出す … 品物を1つずつ足して、税込の合計・消費税・予算の残りを出す
 //                並んだ品物をタップすると、下の入力欄に戻して直せる
+//                品物の右の税率ボタンをタップすると、税率だけ 10% → 8% → 税なし と変わる
 //   税込・税抜 … 値段1つの税込・税抜を、10% と 8% の両方で出す
 //
 // 値段などは、画面の中の数字キーで打つ（スマホのキーボードは出さない。品名だけは文字で入れる）
@@ -145,7 +146,6 @@ function countText(t) {
 
 function detailText(item) {
   const parts = [`${F.groupNumberText(item.price)}円${item.qty && item.qty !== '1' ? ` × ${F.groupNumberText(item.qty)}` : ''}`];
-  parts.push(RATE_LABEL[item.rate]);
   if (item.disc.type === 'pct') parts.push(`${item.disc.value}%引き`);
   if (item.disc.type === 'yen') parts.push(`1個${item.disc.value}円引き`);
   return parts.join('・');
@@ -187,6 +187,7 @@ function renderList() {
   const list = $('#shopItems');
   list.replaceChildren(...st.items.map((item, i) => itemRow(item, i, t.lines[i])));
   $('#shopEmpty').hidden = st.items.length > 0;
+  $('#shopRateNote').hidden = st.items.length === 0;
   flashId = null;
 
   renderEntry();
@@ -204,7 +205,14 @@ function itemRow(item, i, line) {
   li.append(main);
   const amount = el('div', 's-amt');
   amount.append(el('b', '', yen(line.amount)));
-  if (item.rate) amount.append(el('small', '', item.incl ? '税込' : '税抜'));
+  // 税率のボタン：タップで 10% → 8% → 税なし（値段・税込／税抜はそのまま）
+  const tax = el('div', 's-tax');
+  const rate = button(`s-rate r${item.rate}`, RATE_LABEL[item.rate]);
+  rate.dataset.rate = item.id;
+  rate.setAttribute('aria-label', `税率 ${RATE_LABEL[item.rate]}（タップで変える）`);
+  tax.append(rate);
+  if (item.rate) tax.append(el('small', '', item.incl ? '税込' : '税抜'));
+  amount.append(tax);
   li.append(amount);
   if (item.id === st.editing) {
     const del = button('s-del', '消す');
@@ -503,6 +511,18 @@ function deleteItem(id) {
   });
 }
 
+// 一覧の税率ボタン：10% → 8% → 税なし → 10%（税率だけ変える。値段はそのまま）
+function cycleRate(id) {
+  const i = st.items.findIndex((x) => x.id === id);
+  if (i < 0) return;
+  const item = st.items[i];
+  item.rate = S.RATES[(S.RATES.indexOf(item.rate) + 1) % S.RATES.length];
+  if (st.editing === id) st.draft.rate = item.rate; // 直している途中なら、入力欄の税率も
+  flashId = id;
+  render();
+  toast(`${label(i)}${item.name ? `「${item.name}」` : ''}を ${RATE_LABEL[item.rate]} にしました`);
+}
+
 function clearAll() {
   if (!st.items.length) {
     toast('品物はありません');
@@ -799,6 +819,11 @@ export function initShop(h) {
 
   // 品物をタップ → 直す（もう一度タップでやめる）。「消す」で消す
   $('#shopItems').addEventListener('click', (event) => {
+    const rate = event.target.closest('[data-rate]');
+    if (rate) {
+      cycleRate(Number(rate.dataset.rate));
+      return;
+    }
     const del = event.target.closest('[data-del]');
     if (del) {
       deleteItem(Number(del.dataset.del));
@@ -820,6 +845,7 @@ export function initShop(h) {
   });
 
   $('#btnShopCheck').addEventListener('click', openShopCheck);
+  $('#btnRateGuide').addEventListener('click', () => $('#rateDialog').showModal());
   $('#btnShopMore').addEventListener('click', openMore);
   $('#shopToCalc').addEventListener('click', useTotal);
   $('#shopToSplit').addEventListener('click', splitTotal);

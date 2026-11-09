@@ -8,6 +8,7 @@
 //   ・〇日後：日・週・か月・年（月末は合わせる：1/31 の1か月後 → 2/28）、土日祝をとばす（営業日）
 //   ・年齢：満年齢（2/29 生まれは、うるう年でない年は 3/1 に1つ増える）、数え年、干支
 //   ・和暦：明治6年（1873年。日本がこの暦にした年）から
+//   ・和暦の年：年だけで 西暦 ⇔ 令和・平成・昭和・大正・明治（終わった元号も「続いていたら」）・十干十二支
 //   ・祝日：2000〜2099年の分を、祝日の法律のきまりから計算（春分・秋分は計算式）
 // =========================================================
 import * as F from './format.js';
@@ -349,6 +350,91 @@ const ETO_READ = ['ね', 'うし', 'とら', 'う', 'たつ', 'み', 'うま', '
 export function etoText(y) {
   const i = (((y - 4) % 12) + 12) % 12;
   return `${ETO[i]}（${ETO_READ[i]}）年`;
+}
+
+// ---------------------------------------------------------
+// 和暦の年（年だけで 西暦 ⇔ 令和・平成・昭和・大正・明治）
+//   終わった元号も「続いていたら」の年を出す（2025年 ＝ 令和7年 ＝ 平成37年）
+// ---------------------------------------------------------
+export const YEAR_ERAS = ['AD', 'R', 'H', 'S', 'T', 'M'];
+export const eraYearText = (name, n) => `${name}${n === 1 ? '元' : n}年`;
+
+// 元号の始まりの年・終わりの年
+//   明治は 1868年 ＝ 明治元年（改元の日は旧暦なので、始まりの日は出さない）
+function eraSpan(e) {
+  const i = ERAS.indexOf(e);
+  const to = i === 0 ? null : ERAS[i - 1].from - 1; // 終わりの日（いまの元号は null）
+  const last = to === null ? null : civilFromDays(to).y;
+  return {
+    first: e.offset + 1,
+    from: e.key === 'M' ? null : e.from,
+    last,
+    lastN: last === null ? null : last - e.offset,
+    to,
+  };
+}
+
+// y 年は、それぞれの元号の何年か（新しい元号から順に）
+//   state：'in'（その元号の年）・'after'（終わったあと＝続いていたら）・'before'（まだ始まっていない）
+//   startsHere・endsHere：その年の途中から・途中まで（2019年は 平成31年は 4/30 まで、令和元年は 5/1 から）
+export function eraYears(y) {
+  return ERAS.map((e) => {
+    const s = eraSpan(e);
+    const n = y - e.offset;
+    const state = n < 1 ? 'before' : s.last !== null && y > s.last ? 'after' : 'in';
+    return {
+      e, n, state, ...s,
+      startsHere: state === 'in' && s.from !== null && y === s.first,
+      endsHere: state === 'in' && s.to !== null && y === s.last,
+    };
+  });
+}
+
+// y 年を、その元号の年の数に（元年より前なら null）。'AD' はそのまま
+export function yearInEra(y, era) {
+  if (era === 'AD') return y;
+  const e = eraByKey(era);
+  const n = y - e.offset;
+  return n >= 1 ? n : null;
+}
+
+// 年の欄 → 西暦の年。{ y } / { y: null }（空）/ { error }
+//   和暦の年は、元号が終わったあとの年もよい（平成37 → 2025）
+export function parseYear(text, era = 'AD') {
+  if (!text) return { y: null };
+  const n = Number(text);
+  if (era === 'AD') {
+    if (n < MIN_YEAR || n > MAX_YEAR) return { error: `年は ${MIN_YEAR}〜${MAX_YEAR} 年です` };
+    return { y: n };
+  }
+  const e = eraByKey(era);
+  if (!e) return { error: '元号がわかりません' };
+  if (n < 1) return { error: `${e.name}は 1年（元年）からです` };
+  return { y: n + e.offset };
+}
+
+// 年の欄の打ち方（西暦は4桁、和暦は3桁まで。先頭の 0 は打てない）。打てないときは null
+export function typeYear(text, key, { fresh = false, era = 'AD' } = {}) {
+  if (key === 'back') return text ? text.slice(0, -1) : null;
+  if (key === 'clear') return text ? '' : null;
+  if (!/^[0-9]$/.test(key)) return null;
+  if (fresh) text = '';
+  if (!text && key === '0') return null;
+  const next = text + key;
+  return next.length > (era === 'AD' ? 4 : 3) ? null : next;
+}
+
+// 十干十二支（西暦4年が 甲子）。2025年 → 乙巳（きのと・み）
+const KAN = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const KAN_READ = ['きのえ', 'きのと', 'ひのえ', 'ひのと', 'つちのえ', 'つちのと', 'かのえ', 'かのと', 'みずのえ', 'みずのと'];
+export function kanshiParts(y) {
+  const k = (((y - 4) % 10) + 10) % 10;
+  const s = (((y - 4) % 12) + 12) % 12;
+  return { k, s, kan: KAN[k], kanRead: KAN_READ[k], eto: ETO[s], etoRead: ETO_READ[s] };
+}
+export function kanshiText(y) {
+  const p = kanshiParts(y);
+  return `${p.kan}${p.eto}（${p.kanRead}・${p.etoRead}）`;
 }
 
 // 満年齢など。at は「いつの時点で」

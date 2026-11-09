@@ -37,7 +37,7 @@ import {
   initPhys, showPhys, editPhys, checkPhys,
 } from './phys-ui.js';
 
-const VERSION = 'ステップ12（2026-11-09）';
+const VERSION = 'ステップ13（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {

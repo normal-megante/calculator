@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   daysFromCivil, civilFromDays, weekday, dateText, wareki, parseDate, textInEra, typeDate,
   addMonths, ymdBetween, ymdText, holidaysOfYear, holidayName, countKinds, addBusinessDays,
-  shiftDate, ageOf, etoText, breakdown,
+  shiftDate, ageOf, etoText, breakdown, eraYears, parseYear, typeYear, yearInEra, kanshiText,
 } from '../js/date.js';
 
 const z = (y, m, d) => daysFromCivil(y, m, d);
@@ -151,4 +151,51 @@ test('検算の区切り：足すと全部の日数', () => {
   for (const [a, b] of pairs) {
     assert.equal(breakdown(a, b).reduce((t, r) => t + r.days, 0), b - a, `${dateText(a)}〜${dateText(b)}`);
   }
+});
+
+test('和暦の年（年だけ）', () => {
+  const at = (y, key) => eraYears(y).find((r) => r.e.key === key);
+  // 2025年 ＝ 令和7年 ＝ 平成37年 ＝ 昭和100年 ＝ 大正114年 ＝ 明治158年（終わった元号は「続いていたら」）
+  assert.deepEqual(eraYears(2025).map((r) => [r.e.name, r.n, r.state]), [
+    ['令和', 7, 'in'], ['平成', 37, 'after'], ['昭和', 100, 'after'], ['大正', 114, 'after'], ['明治', 158, 'after'],
+  ]);
+  assert.deepEqual([at(2025, 'H').lastN, at(2025, 'H').last], [31, 2019]);
+  // 2019年は 平成31年（4/30 まで）と 令和元年（5/1 から）
+  const h = at(2019, 'H');
+  const r = at(2019, 'R');
+  assert.deepEqual([h.n, h.state, h.endsHere, h.startsHere], [31, 'in', true, false]);
+  assert.deepEqual([r.n, r.state, r.endsHere, r.startsHere], [1, 'in', false, true]);
+  assert.equal(dateText(h.to), '2019/4/30');
+  assert.equal(dateText(r.from), '2019/5/1');
+  // 1989年：昭和64年（1/7 まで）・平成元年（1/8 から）。1926年：大正15年・昭和元年
+  assert.deepEqual([at(1989, 'S').n, at(1989, 'S').endsHere, at(1989, 'H').n, at(1989, 'H').startsHere], [64, true, 1, true]);
+  assert.deepEqual([at(1926, 'T').n, at(1926, 'T').endsHere, at(1926, 'S').n, at(1926, 'S').startsHere], [15, true, 1, true]);
+  // 1868年は明治元年（年の途中からとは出さない）
+  assert.deepEqual([at(1868, 'M').n, at(1868, 'M').state, at(1868, 'M').startsHere], [1, 'in', false]);
+  assert.equal(at(2000, 'R').state, 'before');
+  assert.equal(at(1867, 'M').state, 'before');
+  // 打った年 → 西暦
+  assert.deepEqual(parseYear('37', 'H'), { y: 2025 });
+  assert.deepEqual(parseYear('7', 'R'), { y: 2025 });
+  assert.deepEqual(parseYear('1', 'M'), { y: 1868 });
+  assert.deepEqual(parseYear('2025'), { y: 2025 });
+  assert.deepEqual(parseYear(''), { y: null });
+  assert.match(parseYear('0', 'R').error, /元年/);
+  assert.match(parseYear('0').error, /1〜9999/);
+  assert.equal(yearInEra(2025, 'S'), 100);
+  assert.equal(yearInEra(2000, 'R'), null);
+  assert.equal(yearInEra(2025, 'AD'), 2025);
+  // 打ち方：西暦は4桁、和暦は3桁まで。先頭の 0 は打てない
+  assert.equal(typeYear('202', '5'), '2025');
+  assert.equal(typeYear('2025', '1'), null);
+  assert.equal(typeYear('15', '8', { era: 'M' }), '158');
+  assert.equal(typeYear('158', '1', { era: 'M' }), null);
+  assert.equal(typeYear('', '0'), null);
+  assert.equal(typeYear('37', '5', { fresh: true }), '5');
+  assert.equal(typeYear('37', '/'), null);
+  assert.equal(typeYear('37', 'back'), '3');
+  // 十干十二支（西暦4年が 甲子）
+  assert.equal(kanshiText(2025), '乙巳（きのと・み）');
+  assert.equal(kanshiText(1984), '甲子（きのえ・ね）');
+  assert.equal(kanshiText(2026), '丙午（ひのえ・うま）');
 });

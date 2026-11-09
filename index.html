@@ -135,6 +135,7 @@
           </div>
         </section>
         <ol class="shop-items" id="shopItems" aria-label="品物"></ol>
+        <p class="s-note" id="shopRateNote" hidden>右の <b>10%</b> をタップで税率だけ変わります。<button type="button" class="link" id="btnRateGuide">8%になる物は？</button></p>
         <p class="empty small" id="shopEmpty">下で値段を打って「追加」を押すと、ここに並びます。<br>並んだ品物をタップすると直せます。</p>
       </div>
 
@@ -378,7 +379,8 @@
       <div class="subtabs" id="dateTabs" role="tablist" aria-label="日付の計算">
         <button type="button" role="tab" data-tab="count" aria-selected="true">日数</button>
         <button type="button" role="tab" data-tab="add" aria-selected="false">〇日後</button>
-        <button type="button" role="tab" data-tab="age" aria-selected="false">年齢・和暦</button>
+        <button type="button" role="tab" data-tab="age" aria-selected="false">年齢</button>
+        <button type="button" role="tab" data-tab="year" aria-selected="false">和暦の年</button>
       </div>
       <div class="shop-pane">
         <section class="shop-sum" aria-label="答え">
@@ -401,6 +403,7 @@
           <button type="button" class="fld" data-dfield="n"><small>数</small><span class="v"></span><small class="unit"></small></button>
           <button type="button" class="fld" data-dfield="birth"><small>生年月日</small><span class="v"></span><small class="unit"></small></button>
           <button type="button" class="fld" data-dfield="at"><small>いつの時点</small><span class="v"></span><small class="unit"></small></button>
+          <button type="button" class="fld" data-dfield="year"><small>年</small><span class="v"></span><small class="unit"></small></button>
         </div>
         <div class="entry-opts" id="dateOpts"></div>
         <p class="entry-hint"><span id="dateHint"></span><b id="dateAmount"></b></p>
@@ -818,6 +821,48 @@
     </div>
   </dialog>
 
+  <!-- お買い物：税率の早見 -->
+  <dialog class="sheet" id="rateDialog" aria-labelledby="rateTitle">
+    <div class="sheet-head">
+      <h2 id="rateTitle">税率の早見</h2>
+      <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="d-sec">
+      <h3>8%（軽減税率）</h3>
+      <ul class="rate-list">
+        <li>食べ物・飲み物（お酒はのぞく）。お米・お菓子・ジュース・ミネラルウォーター など</li>
+        <li>持ち帰り（テイクアウト）・出前・宅配の食べ物</li>
+        <li>新聞（週2回以上出て、定期購読しているもの）</li>
+      </ul>
+    </div>
+    <div class="d-sec">
+      <h3>10%</h3>
+      <ul class="rate-list">
+        <li>お酒（ビール・ワイン・本みりん など）</li>
+        <li>外食（お店の中で食べる。イートイン・フードコートも）・ケータリング</li>
+        <li>薬・医薬部外品（栄養ドリンクでも、医薬部外品なら 10%）</li>
+        <li>日用品・服・電気製品・水道水・駅やコンビニで1部ずつ買う新聞 など</li>
+      </ul>
+    </div>
+    <div class="d-sec">
+      <h3>税なし（消費税がかからない）</h3>
+      <ul class="rate-list">
+        <li>切手・はがき（郵便局などで買うとき）・収入印紙</li>
+        <li>商品券・プリペイドカードを買うとき</li>
+        <li>病院の保険の分・学校の授業料・住むための家賃 など</li>
+      </ul>
+    </div>
+    <div class="d-sec">
+      <h3>まよいやすい物</h3>
+      <ul class="rate-list">
+        <li>同じお弁当でも、お店の中で食べると 10%、持ち帰ると 8%</li>
+        <li>おまけ付きのお菓子など（食べ物と物のセット）：税抜で1万円以下、食べ物の分が 2/3 以上なら全部 8%。ちがえば全部 10%</li>
+        <li>レシートでは、8% の品物に「※」「軽」などのしるしが付いていることが多いです（しるしはお店によります）</li>
+      </ul>
+      <p class="hint">2019年10月からのきまりで書いています。税率が変わることもあるので、まよったらレシートを見てください。</p>
+    </div>
+  </dialog>
+
   <!-- 割り勘：端数の決め方とコピー -->
   <dialog class="sheet" id="splitMoreDialog" aria-labelledby="splitMoreTitle">
     <div class="sheet-head">
@@ -925,6 +970,7 @@
       <h3>お買い物</h3>
       <ul>
         <li><b>合計を出す</b>：値段・個数・税率（10%／8%）・割引を入れて足していくと、税込の合計が出ます。予算を入れると残りも出ます。</li>
+        <li>並んだ品物の右の「10%」「8%」をタップすると、あとからでも税率だけ変えられます（10% → 8% → 税なし）。「8%になる物は？」で、どの税率かの早見が出ます。</li>
         <li><b>税込・税抜</b>：値段を1つ打つと、10% と 8% の税込・税抜がすぐ出ます。</li>
         <li>消費税は、レシートと同じく「税率ごとにまとめて」計算し、1円未満は切り捨てます（⋯ から変えられます）。</li>
       </ul>
@@ -946,7 +992,8 @@
       <ul>
         <li><b>日数</b>：始めと終わりの日付で、間の日数が出ます（始めの日も数えた「〇日間」も）。平日・土日・祝日の数も出ます。</li>
         <li><b>〇日後</b>：日付から〇日・〇週・〇か月・〇年あと（前）の日付が出ます。1/31 の1か月後のように、ない日になるときは月末（2/28）に合わせます。土日・祝日をとばす（営業日）もできます。</li>
-        <li><b>年齢・和暦</b>：生年月日から満年齢・和暦・干支・次の誕生日まで、が出ます。</li>
+        <li><b>年齢</b>：生年月日から満年齢・和暦・干支・次の誕生日まで、が出ます。</li>
+        <li><b>和暦の年</b>：年だけ打つと、西暦・令和・平成・昭和・大正・明治の年が全部出ます（令和7年 ＝ 平成37年 のように、終わった元号は「続いていたら」の年）。「打つ年」で 平成37 のように和暦の年でも打てます（えらぶと、同じ年のまま変わります）。干支（十干十二支）・うるう年・皇紀も。</li>
         <li>日付は「2026/11/9」のように「/」で区切って打ちます。「和暦」キーで 令和・平成・昭和 の年でも打てます。空の欄は「今日」です。</li>
         <li>祝日は 2000〜2099年の分を、祝日の法律のきまりから計算しています（法律が変わると、ずれることがあります）。会社の休みや年末年始は入っていません。</li>
       </ul>

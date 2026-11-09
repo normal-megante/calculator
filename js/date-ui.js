@@ -3,7 +3,8 @@
 //
 //   「日数」：始め 〜 終わり の日数・〇週〇日・〇か月〇日・平日／土日／祝日の数
 //   「〇日後」：日付から 〇日・週・か月・年 あと（前）の日付（土日祝をとばす もえらべる）
-//   「年齢・和暦」：満年齢・数え年・和暦・干支・次の誕生日まで
+//   「年齢」：満年齢・数え年・和暦・干支・次の誕生日まで
+//   「和暦の年」：年だけ打つと、西暦・令和・平成・昭和・大正・明治の年を全部（終わった元号も「続いていたら」）
 //
 // 日付の欄は、数字キーと「/」で打つ（「今日」キー、「和暦」キー、カレンダーからもえらべる）。
 // 空の欄は「今日」（生年月日だけは空のまま）。計算そのものは date.js
@@ -15,8 +16,8 @@ import { typeKey, el, button, shake, seg as segOf, setField, setupPad } from './
 
 const STORE_KEY = 'calculator.date';
 const DATE_FIELDS = ['from', 'to', 'base', 'birth', 'at'];
-const TAB_FIELDS = { count: ['from', 'to'], add: ['base', 'n'], age: ['birth', 'at'] };
-const TAB_LABEL = { count: '日数', add: '〇日後・〇日前', age: '満年齢' };
+const TAB_FIELDS = { count: ['from', 'to'], add: ['base', 'n'], age: ['birth', 'at'], year: ['year'] };
+const TAB_LABEL = { count: '日数', add: '〇日後・〇日前', age: '満年齢', year: '西暦と和暦（年）' };
 const HINTS = {
   from: '空なら今日。「2026/11/9」のように「/」で区切ります',
   to: '空なら今日。「12/25」だけなら今年の 12/25',
@@ -24,18 +25,20 @@ const HINTS = {
   n: '何日（週・か月・年）あと、または前か',
   birth: '「和暦」キーで、昭和60/5/3 のようにも打てます',
   at: '空なら、今日の時点の年齢',
+  year: '空なら今年。下で 令和・平成… をえらぶと、同じ年のまま和暦の年に変わります（平成37 のようにも打てます）',
 };
 const ERA_CYCLE = ['AD', 'R', 'H', 'S', 'T'];
+const ERA_LABEL = { AD: '西暦', R: '令和', H: '平成', S: '昭和', T: '大正', M: '明治' };
 const blankDate = () => ({ text: '', era: 'AD' });
 
 const st = {
   tab: 'count',
-  f: { from: blankDate(), to: blankDate(), base: blankDate(), birth: blankDate(), at: blankDate() },
+  f: { from: blankDate(), to: blankDate(), base: blankDate(), birth: blankDate(), at: blankDate(), year: blankDate() },
   n: '',
   unit: 'd',
   dir: 1,
   biz: false,
-  field: { count: 'to', add: 'n', age: 'birth' }, // タブごとに、数字キーが入る欄
+  field: { count: 'to', add: 'n', age: 'birth', year: 'year' }, // タブごとに、数字キーが入る欄
   fresh: false,
 };
 let hooks = {};
@@ -69,6 +72,10 @@ function load() {
         st.f[k] = { text: v.text, era: ERA_CYCLE.includes(v.era) ? v.era : 'AD' };
       }
     }
+    const yv = s.f?.year;
+    if (yv && typeof yv.text === 'string' && /^\d{0,4}$/.test(yv.text)) {
+      st.f.year = { text: yv.text, era: D.YEAR_ERAS.includes(yv.era) ? yv.era : 'AD' };
+    }
     if (typeof s.n === 'string' && /^\d{0,6}$/.test(s.n)) st.n = s.n;
     if (D.UNITS[s.unit]) st.unit = s.unit;
     st.dir = s.dir === -1 ? -1 : 1;
@@ -91,11 +98,29 @@ function valueOf(key) {
   return D.parseDate(t.text, t.era, todayZ());
 }
 
+// 和暦の年の欄 → { y, isNow } / { error }（空なら今年）
+function yearValue() {
+  const t = st.f.year;
+  if (!t.text) return { y: D.civilFromDays(todayZ()).y, isNow: true };
+  return D.parseYear(t.text, t.era);
+}
+
 const eraName = (era) => D.eraByKey(era)?.name ?? '';
 
 function showField(key) {
   const b = document.querySelector(`[data-dfield="${key}"]`);
   const active = cur() === key;
+  if (key === 'year') {
+    const t = st.f.year;
+    const name = t.era === 'AD' ? '' : eraName(t.era);
+    const v = yearValue();
+    setField(b, {
+      text: t.text, placeholder: name ? `${name} 〇` : '今年', active, fresh: st.fresh,
+      shown: t.text ? `${name}${name && t.text === '1' ? '元' : t.text}` : null,
+      unit: !t.text && !name ? '' : name && t.text && v.y ? `年（${v.y}年）` : '年',
+    });
+    return;
+  }
   if (key === 'n') {
     setField(b, {
       text: st.n, placeholder: '0', active, fresh: st.fresh,
@@ -135,12 +160,12 @@ function render() {
   for (const b of document.querySelectorAll('[data-dfield]')) b.hidden = !visible.includes(b.dataset.dfield);
   for (const key of visible) showField(key);
   $('#dateLabel').textContent = TAB_LABEL[st.tab];
-  const out = st.tab === 'count' ? countResult() : st.tab === 'add' ? addResult() : ageResult();
-  renderCard(out);
+  renderCard(resultOf());
   renderOpts();
-  const v = isDateField(cur()) ? valueOf(cur()) : null;
-  $('#dateHint').textContent = v?.error && st.f[cur()].text ? v.error : HINTS[cur()];
-  $('#dateHint').classList.toggle('ng', !!(v?.error && st.f[cur()].text));
+  const f = cur();
+  const err = f === 'year' ? yearValue().error : isDateField(f) && st.f[f].text ? valueOf(f).error : null;
+  $('#dateHint').textContent = err ?? HINTS[f];
+  $('#dateHint').classList.toggle('ng', !!err);
   save();
 }
 
@@ -258,6 +283,54 @@ function ageResult() {
   };
 }
 
+const yearWord = (name, n) => `${name}${n === 1 ? '元' : n}年`;
+
+function yearResult() {
+  const v = yearValue();
+  if (v.error) return { error: v.error, main: '—' };
+  const y = v.y;
+  const nowY = D.civilFromDays(todayZ()).y;
+  const list = D.eraYears(y);
+  const rows = [];
+  // 和暦で打った年が、終わった元号の「続いていたら」の年のとき（すぐそばに注意書き）
+  const typed = list.find((r) => r.e.key === st.f.year.era);
+  if (typed?.state === 'after') {
+    rows.push({ text: `${typed.e.name}は ${typed.lastN}年（${D.dateText(typed.to)}）までなので、${yearWord(typed.e.name, typed.n)}は「続いていたら」の年です`, cls: 'hol' });
+  }
+  for (const r of list) {
+    const name = r.e.name;
+    if (r.state === 'before') {
+      rows.push({ text: `${name}はまだです（${name}元年 ＝ ${r.first}年）`, right: '—' });
+    } else if (r.state === 'after') {
+      rows.push({ text: `${name}（${r.lastN}年 ＝ ${r.last}年 で終わり。続いていたら）`, right: yearWord('', r.n) });
+    } else {
+      const note = r.endsHere ? `（${D.shortMD(r.to)} まで）` : r.startsHere ? `（${D.shortMD(r.from)} から）` : '';
+      rows.push({ text: `${name}${note}`, right: yearWord('', r.n) });
+    }
+  }
+  if (y < 1868) rows.push({ text: '明治より前の元号（慶応・元治…）は、数がとても多いので出しません', cls: 'muted' });
+  if (y < 1873) rows.push({ text: '1872年（明治5年）までの日本は旧暦なので、月日は西暦とずれます', cls: 'muted' });
+  rows.push({ text: '皇紀（神武天皇の即位から数える。戦前によく使われた）', right: `${y + 660}年` });
+  rows.push({ text: '干支', right: D.kanshiText(y) });
+  rows.push({ text: `${y}年は`, right: D.isLeap(y) ? 'うるう年（366日）' : '365日' });
+  rows.push({ text: '世紀', right: `${Math.ceil(y / 100)}世紀（${Math.floor(y / 10) * 10}年代）` });
+  if (y === nowY) rows.push({ text: '今年です' });
+  else rows.push({ text: `今年（${nowY}年）から`, right: `${Math.abs(nowY - y)}年${y < nowY ? '前' : '後'}` });
+  if (y < nowY) rows.push({ text: `${y}年生まれの人の ${nowY}年の誕生日の年齢（誕生日の前は ${nowY - y - 1}歳）`, right: `${nowY - y}歳` });
+  const ins = list.filter((r) => r.state === 'in').reverse();
+  return {
+    ok: true,
+    main: `${y}年`,
+    sub: ins.map((r) => yearWord(r.e.name, r.n)).join(' → '),
+    count: v.isNow ? '今年' : '',
+    rows,
+    y,
+    list,
+  };
+}
+
+const resultOf = () => ({ count: countResult, add: addResult, age: ageResult, year: yearResult })[st.tab]();
+
 // 欄の下のえらぶボタン
 function renderOpts() {
   const box = $('#dateOpts');
@@ -286,6 +359,9 @@ function renderOpts() {
       st.fresh = false;
       render();
     }));
+  }
+  if (st.tab === 'year') {
+    box.append(seg(D.YEAR_ERAS.map((k) => [k, ERA_LABEL[k]]), st.f.year.era, setYearEra, '打つ年'));
   }
   if (isDateField(cur())) box.append(button('chip', 'カレンダーでえらぶ', openPicker));
 }
@@ -331,9 +407,63 @@ function switchEra(fld, target) {
   render();
 }
 
+// 「打つ年」（と「和暦」キー）：打った年を、同じ年のまま別の元号の年に
+function setYearEra(era) {
+  const t = st.f.year;
+  if (era === t.era) return;
+  const v = yearValue();
+  if (v.error) {
+    t.era = era;
+    t.text = '';
+    st.fresh = false;
+    return render();
+  }
+  const n = D.yearInEra(v.y, era);
+  if (n === null) {
+    const e = D.eraByKey(era);
+    toast(`${v.y}年は、まだ${e.name}ではありません（${e.name}元年 ＝ ${e.offset + 1}年）`);
+    return render();
+  }
+  t.era = era;
+  t.text = String(n);
+  st.fresh = true;
+  render();
+}
+
+// 「和暦」キー：西暦 → 令和 → 平成 → 昭和 → 大正 → 明治（まだ始まっていない元号はとばす）
+function cycleYearEra() {
+  const t = st.f.year;
+  const v = yearValue();
+  const list = D.YEAR_ERAS;
+  for (let k = 1; k <= list.length; k++) {
+    const era = list[(list.indexOf(t.era) + k) % list.length];
+    if (v.error || D.yearInEra(v.y, era) !== null) return setYearEra(era);
+  }
+}
+
 function press(key, target) {
   if (key === 'next') return goNext();
   const f = cur();
+  if (f === 'year') {
+    const t = st.f.year;
+    if (key === '/') return reject(target);
+    if (key === 'today') {
+      t.era = 'AD';
+      t.text = String(D.civilFromDays(todayZ()).y);
+      st.fresh = true;
+      return render();
+    }
+    if (key === 'era') return cycleYearEra();
+    if (key === 'clear' && !t.text && t.era !== 'AD') {
+      t.era = 'AD';
+      return render();
+    }
+    const next = D.typeYear(t.text, key, { fresh: st.fresh, era: t.era });
+    if (next === null) return reject(target);
+    t.text = next;
+    st.fresh = false;
+    return render();
+  }
   if (f === 'n') {
     if (['/', 'today', 'era'].includes(key)) return reject(target);
     const next = typeKey(st.n, key, { fresh: st.fresh, maxDecimals: 0, maxInt: 6 });
@@ -418,7 +548,7 @@ function breakdownSection(p, q, expected, title) {
 }
 
 function openDateCheck() {
-  const out = st.tab === 'count' ? countResult() : st.tab === 'add' ? addResult() : ageResult();
+  const out = resultOf();
   if (!out.ok) return;
   $('#checkTitle').textContent = '日付の検算';
   const body = $('#checkBody');
@@ -483,6 +613,36 @@ function openDateCheck() {
       allOk &&= back === a.z;
     }
     body.append(section('2. 逆算', rev));
+  } else if (st.tab === 'year') {
+    const { y, list } = out;
+    const calc = el('div');
+    const rev = el('div');
+    for (const r of list) {
+      if (r.state === 'before') continue;
+      calc.append(line(`${y} − ${r.e.offset} ＝ ${r.n} → ${yearWord(r.e.name, r.n)}（${r.e.name}元年が ${r.first}年なので、その前の年 ${r.e.offset} をひく）`));
+      const back = r.n + r.e.offset;
+      rev.append(checked(`${yearWord(r.e.name, r.n)}：${r.n} ＋ ${r.e.offset} ＝ ${back}年`, back === y));
+      allOk &&= back === y;
+    }
+    if (calc.childNodes.length) {
+      body.append(section('1. 元号の年 ＝ 西暦 − 元年の前の年', calc));
+      body.append(section('2. 逆算（元号の年 ＋ 元年の前の年 ＝ 西暦）', rev));
+    } else {
+      calc.append(line('明治より前なので、元号の年は出していません'));
+      body.append(section('1. 元号の年', calc));
+    }
+    const p = D.kanshiParts(y);
+    const k = el('div');
+    k.append(line(`十干：(${y} − 4) ÷ 10 のあまり ${p.k} → ${p.kan}（${p.kanRead}）`));
+    k.append(line(`十二支：(${y} − 4) ÷ 12 のあまり ${p.s} → ${p.eto}（${p.etoRead}）`));
+    k.append(el('p', 'hint', '西暦4年が「甲子」（十干も十二支も1番め。あまり 0）なので、4 をひいてから割ります。干支は1月1日で変わるとしています（立春で変わるとする数え方もあります）。'));
+    body.append(section('3. 干支', k));
+    const leap = el('div');
+    if (y % 400 === 0) leap.append(line(`${y} は 400 で割り切れる → うるう年（366日）`));
+    else if (y % 100 === 0) leap.append(line(`${y} は 100 で割り切れて、400 では割り切れない → うるう年ではない（365日）`));
+    else if (y % 4 === 0) leap.append(line(`${y} は 4 で割り切れる（100 では割り切れない）→ うるう年（366日）`));
+    else leap.append(line(`${y} ÷ 4 ＝ ${Math.floor(y / 4)} あまり ${y % 4} → うるう年ではない（365日）`));
+    body.append(section('4. うるう年', leap));
   } else {
     const { r, b, t } = out;
     const by = D.civilFromDays(b.z).y;
