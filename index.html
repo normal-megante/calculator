@@ -24,6 +24,7 @@
         <button type="button" role="tab" data-mode="date" aria-selected="false">日付</button>
         <button type="button" role="tab" data-mode="unit" aria-selected="false">単位</button>
         <button type="button" role="tab" data-mode="calculus" aria-selected="false">微積分</button>
+        <button type="button" role="tab" data-mode="base" aria-selected="false">n進法</button>
       </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
@@ -546,6 +547,81 @@
         <button type="button" data-k="next" class="k eq" aria-label="次の欄へ">次へ</button>
       </section>
     </div>
+
+    <!-- n進法 -->
+    <div class="view bs" id="baseView" hidden>
+      <div class="subtabs bs-tabs" id="bsTabs" role="tablist" aria-label="打つ数の進法">
+        <button type="button" role="tab" data-base="2" aria-selected="false">2進</button>
+        <button type="button" role="tab" data-base="8" aria-selected="false">8進</button>
+        <button type="button" role="tab" data-base="10" aria-selected="true">10進</button>
+        <button type="button" role="tab" data-base="16" aria-selected="false">16進</button>
+        <button type="button" role="tab" data-base="n" aria-selected="false">n進</button>
+      </div>
+      <div class="bs-other" id="bsOther" hidden>
+        <button type="button" class="chip" data-step="-1" aria-label="進法を1つ小さく">−</button>
+        <b id="bsOtherName">3進</b>
+        <button type="button" class="chip" data-step="1" aria-label="進法を1つ大きく">＋</button>
+        <small id="bsOtherDigits"></small>
+      </div>
+      <div class="bs-pane">
+        <section class="display bs-display" id="bsDisplay">
+          <div class="expr-wrap" id="bsExprWrap">
+            <div class="expr" id="bsExpr" aria-label="式（タップした所にカーソルを置けます）"></div>
+          </div>
+          <div class="result" id="bsResult" aria-live="polite" aria-label="答え（タップでコピー）"></div>
+          <div class="t-actions" id="bsActions" hidden>
+            <button type="button" class="check-btn" id="btnBsCheck">✓ 検算</button>
+            <button type="button" class="ghost mini" id="btnBsToCalc">電卓で使う</button>
+          </div>
+          <div class="notes" id="bsNotes"></div>
+        </section>
+        <div class="bs-rows" id="bsRows"></div>
+      </div>
+
+      <section class="keypad bs-keys" id="bsKeys" aria-label="n進法のキー">
+        <button type="button" data-k="A" class="k num hex">A</button>
+        <button type="button" data-k="B" class="k num hex">B</button>
+        <button type="button" data-k="C" class="k num hex">C</button>
+        <button type="button" data-k="and" class="k fn word" aria-label="AND（どちらも 1 なら 1）">AND</button>
+        <button type="button" data-k="clear" class="k fn danger" aria-label="全部消す">AC</button>
+
+        <button type="button" data-k="D" class="k num hex">D</button>
+        <button type="button" data-k="E" class="k num hex">E</button>
+        <button type="button" data-k="F" class="k num hex">F</button>
+        <button type="button" data-k="or" class="k fn word" aria-label="OR（どちらかが 1 なら 1）">OR</button>
+        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+
+        <button type="button" data-k="7" class="k num">7</button>
+        <button type="button" data-k="8" class="k num">8</button>
+        <button type="button" data-k="9" class="k num">9</button>
+        <button type="button" data-k="xor" class="k fn word" aria-label="XOR（ちがえば 1）">XOR</button>
+        <button type="button" data-k="÷" class="k op">÷</button>
+
+        <button type="button" data-k="4" class="k num">4</button>
+        <button type="button" data-k="5" class="k num">5</button>
+        <button type="button" data-k="6" class="k num">6</button>
+        <button type="button" data-k="not" class="k fn word" aria-label="NOT（ビットを全部ひっくり返す）">NOT</button>
+        <button type="button" data-k="×" class="k op">×</button>
+
+        <button type="button" data-k="1" class="k num">1</button>
+        <button type="button" data-k="2" class="k num">2</button>
+        <button type="button" data-k="3" class="k num">3</button>
+        <button type="button" data-k="mod" class="k fn word" aria-label="mod（割り算のあまり）">mod</button>
+        <button type="button" data-k="−" class="k op">−</button>
+
+        <button type="button" data-k="0" class="k num">0</button>
+        <button type="button" data-k="." class="k num">.</button>
+        <button type="button" data-k="<<" class="k fn" aria-label="左へずらす（×2ⁿ）">&lt;&lt;</button>
+        <button type="button" data-k=">>" class="k fn" aria-label="右へずらす（÷2ⁿ の切り捨て）">&gt;&gt;</button>
+        <button type="button" data-k="+" class="k op">+</button>
+
+        <button type="button" data-k="left" class="k move" aria-label="カーソルを左へ">◀</button>
+        <button type="button" data-k="right" class="k move" aria-label="カーソルを右へ">▶</button>
+        <button type="button" data-k="(" class="k fn">(</button>
+        <button type="button" data-k=")" class="k fn">)</button>
+        <button type="button" data-k="=" class="k eq">=</button>
+      </section>
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -779,6 +855,15 @@
         <li>角度は rad（微分・積分では、ふつうこちら）。式に sin などがあるときは「角度」のボタンで度に切りかえられます（電卓の角度とは別）。</li>
         <li>「✓ 検算」は、差の商（微分）・細い長方形（積分）・途中までの和（Σ）・x を近づけた表（lim）など、別の方法で計算して答えに近づくかを見せます。</li>
         <li>数値の計算は、なめらかでない式・ふれ続ける式などで、まちがえたり計算できなかったりすることがあります。</li>
+      </ul>
+      <h3>n進法</h3>
+      <ul>
+        <li>上の「n進法」で、打つ数の進法（2進・8進・10進・16進・n進＝3〜15進）をえらんで、数や式を打ちます。答えは 2進・8進・10進・16進 で同時に出ます（タップでコピー）。</li>
+        <li>16進の A〜F（10〜15）もキーで打てます。その進法で使えない数字のキーは、うすくなります。</li>
+        <li>途中で進法を変えると、16進の FF と 2進の 1010 のように、ちがう進法の数を1つの式でまぜられます（いまの進法とちがう数には、FF₁₆ のように小さく進法を付けます）。</li>
+        <li>AND・OR・XOR・NOT・シフト（&lt;&lt; &gt;&gt;）は、ビット（2進の1桁）ごとの計算で、整数だけで使えます。マイナスの数は「2の補数」（コンピューターの中の表し方）として計算します。計算の順番は × ÷ mod → ＋ − → シフト → AND → XOR → OR です。</li>
+        <li>÷ は小数まで正確に出します。くり返す小数は、くり返す所に上の線を付けます（10進の 0.1 は、2進では 0.0<span style="text-decoration: overline">0011</span>）。</li>
+        <li>「✓ 検算」は、数を位ごとに10進になおす → 10進で計算（ビットの表も）→ 割ったあまりを下から読んで n進法へ → 逆算、の順に見せます。</li>
       </ul>
       <p class="hint">履歴やいまの式、お買い物の品物、割り勘・時給の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>

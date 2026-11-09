@@ -1154,3 +1154,79 @@ button.ghost.mini { min-height: 34px; padding: 0 12px; font-size: 13px; }
 .cu-keys .k.unit { font-size: 23px; font-style: italic; }
 .cu-keys .k.eq { grid-column: span 2; font-size: 20px; }
 .cu-keys [data-k="inf"] { font-size: 24px; }
+
+/* =========================================================
+   n進法
+   ========================================================= */
+.bs-tabs button { min-width: 0; padding: 0 2px; }
+.bs-other { flex: none; display: flex; align-items: center; gap: 8px; margin: -2px 12px 6px; }
+.bs-other[hidden] { display: none; }
+.bs-other .chip { min-width: 44px; min-height: 32px; padding: 0; font-size: 18px; }
+.bs-other b { min-width: 3.2em; text-align: center; font-size: 16px; }
+.bs-other small { margin-left: auto; font-size: 12px; color: var(--muted); }
+.bs-pane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.bs-display { flex: none; min-height: 112px; }
+.bs-display .notes { flex: none; }
+.expr .sep.gap, .bs-gap { display: inline-block; width: 0.28em; }
+.expr .tk.op.word { font-size: 0.5em; font-weight: 700; margin: 0 0.3em; vertical-align: 0.18em; }
+.expr .bsub { font-size: 0.5em; color: var(--muted); margin: 0 0.08em 0 0.04em; }
+.bs-sub { font-size: 0.5em; color: var(--muted); margin-left: 0.06em; }
+.bs-rep { text-decoration: overline; text-decoration-color: var(--accent); }
+.bs-cut { color: var(--muted); }
+.result.bs-wrap { white-space: normal; word-break: break-all; line-height: 1.25; }
+.bs-rows { flex: none; padding: 0 12px 8px; }
+.bs-head { margin: 4px 2px 2px; font-size: 12px; color: var(--muted); }
+.bs-row {
+  display: grid;
+  grid-template-columns: 4em minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bs-row:active { background: var(--chip); }
+.bs-row.from { background: var(--ref-bg); border-radius: 10px; border-bottom-color: transparent; }
+.bs-name { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.bs-name small { display: block; font-size: 10.5px; font-weight: 400; color: var(--muted); }
+.bs-val {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: right;
+  word-break: break-all;
+}
+.bs-val .bs-hex { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.bs-note { grid-column: 1 / -1; margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+
+.bs-keys { grid-template-rows: repeat(7, 1fr); gap: 6px; height: min(46dvh, 392px); padding-top: 6px; }
+.bs-keys .k { font-size: 20px; border-radius: 13px; transition: transform 0.06s, filter 0.06s, opacity 0.15s; }
+.bs-keys .k.num { font-size: 23px; }
+.bs-keys .k.op { font-size: 26px; }
+.bs-keys .k.fn { font-size: 18px; }
+.bs-keys .k.word { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+.bs-keys .k.move { font-size: 16px; }
+.bs-keys .k.eq { grid-column: auto; font-size: 26px; }
+.bs-keys .k.bs-off { opacity: 0.28; }
+
+/* 検算：ビットの表・n進法になおす */
+.bs-step { margin-bottom: 6px; }
+.bs-step .hint { margin: 2px 2px 6px; }
+.bs-bits { border-collapse: collapse; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.bs-bits td { padding: 1px 6px; font-size: 15px; line-height: 1.5; }
+.bs-bits .op { min-width: 2.6em; text-align: right; font-size: 12px; font-weight: 700; color: var(--accent); }
+.bs-bits .b { font-family: ui-monospace, 'Roboto Mono', monospace; text-align: right; white-space: nowrap; }
+.bs-bits .d { font-size: 12.5px; color: var(--muted); }
+.bs-bits tr.sum td { border-top: 1px solid var(--line); font-weight: 700; }
+.bs-conv { margin: 2px 0 8px; }
+.bs-conv summary { padding: 6px 0; font-size: 15px; font-weight: 600; cursor: pointer; word-break: break-all; }
+.bs-conv .calc-line { font-size: 15px; }

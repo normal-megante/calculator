@@ -29,8 +29,9 @@ import { initDate, showDate } from './date-ui.js';
 import { initUnit, showUnit } from './unit-ui.js';
 import { initSci } from './sci-ui.js';
 import { initCalculus, showCalculus } from './calculus-ui.js';
+import { initBase, showBase } from './base-ui.js';
 
-const VERSION = 'ステップ9（2026-11-09）';
+const VERSION = 'ステップ10（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -360,7 +361,7 @@ function equals(button) {
 // ---------------------------------------------------------
 const VIEWS = {
   calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView', unit: '#unitView',
-  calculus: '#calculusView',
+  calculus: '#calculusView', base: '#baseView',
 };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
@@ -388,7 +389,8 @@ function applyMode() {
   else if (mode === 'time') showTime();
   else if (mode === 'date') showDate();
   else if (mode === 'unit') showUnit();
-  else showCalculus();
+  else if (mode === 'calculus') showCalculus();
+  else showBase();
 }
 
 // ---------------------------------------------------------
@@ -676,6 +678,19 @@ function start() {
     onUseInCalc(value, label) {
       useInCalc(value, label);
       toast('答えを電卓の式に入れました');
+    },
+  });
+  initBase({
+    settings: () => settings,
+    active: () => currentMode() === 'base',
+    // n進法の ＝
+    onSaveHistory(items, value, meta) {
+      addHistory(items, value, meta);
+    },
+    // n進法の答えを電卓の式に入れる
+    onUseInCalc(value, label) {
+      useInCalc(value, label);
+      toast('答えを電卓の式に入れました（10進の数として）');
     },
   });
   applyMode();
