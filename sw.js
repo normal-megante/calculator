@@ -11,7 +11,7 @@
 //   （書き忘れても、ネットで1回開けばしまわれます。テストでもチェックしています）
 // =========================================================
 
-const CACHE = 'calculator-v16';   // しまっておく入れ物の名前
+const CACHE = 'calculator-v17';   // しまっておく入れ物の名前
 const NETWORK_TIMEOUT = 4000;    // ネットの返事をこれだけ（ミリ秒）待ち、来なければしまってある分を使う
 
 // 最初にまとめてしまっておくファイル
@@ -57,6 +57,8 @@ const PRECACHE = [
   'js/phys-ui.js',
   'js/big.js',
   'js/big-ui.js',
+  'js/prob.js',
+  'js/prob-ui.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-192.png',

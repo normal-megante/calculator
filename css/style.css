@@ -1343,6 +1343,33 @@ button.ghost.mini { min-height: 34px; padding: 0 12px; font-size: 13px; }
 .bn-fm-note { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--muted); }
 .bn-fm-note.ng { color: var(--danger); font-weight: 600; }
 
+/* =========================================================
+   確率・場合の数
+   ========================================================= */
+.pb-list { flex: none; margin: 0 12px 8px; }
+.pb-pane { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
+.pb-card .sum-label { margin-right: auto; }
+.pb-show { margin: 3px 0 1px; font-size: 15px; font-weight: 600; line-height: 1.4; word-break: break-all; }
+.pb-mode { display: flex; width: fit-content; margin: 4px 0 2px auto; }
+.pb-mode button { min-width: 3.6em; }
+.pb-answer { font-size: 32px; font-weight: 700; line-height: 1.3; text-align: right; font-variant-numeric: tabular-nums; word-break: break-all; }
+.pb-answer.long { font-size: 25px; }
+.pb-answer.longer { font-size: 20px; }
+.pb-answer.muted { color: var(--muted); }
+.pb-answer:disabled { cursor: default; }
+.pb-answer .pb-eq { font-size: 0.5em; font-weight: 600; color: var(--muted); }
+.pb-answer .u { font-size: 0.62em; font-weight: 600; }
+.pb-answer sup { font-size: 0.62em; }
+.pb-sub { word-break: break-all; }
+.pb-notes p.ex { color: var(--text); opacity: 0.8; }
+.pb-fields { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 6px; }
+.pb-fields .fld { flex-wrap: wrap; justify-content: flex-end; min-height: 46px; padding: 3px 9px 4px; }
+.pb-fields .fld small:first-child { flex-basis: 100%; overflow: hidden; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
+.pb-fields .fld .v { font-size: 20px; }
+.pb-fields .fld .v.long { font-size: 16px; }
+.pb-fields .fld .v.longer { font-size: 13px; }
+.pb-keys .k.dim { opacity: 0.35; }
+
 /* お買い物：品物の税率ボタン（タップで 10% → 8% → 税なし） */
 .s-tax { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 2px; }
 .s-rate {

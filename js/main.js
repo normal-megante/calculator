@@ -37,8 +37,9 @@ import {
   initPhys, showPhys, editPhys, checkPhys,
 } from './phys-ui.js';
 import { initBig, showBig } from './big-ui.js';
+import { initProb, showProb } from './prob-ui.js';
 
-const VERSION = 'ステップ15（2026-11-09）';
+const VERSION = 'ステップ16（2026-11-10）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -385,7 +386,7 @@ function equals(button) {
 // ---------------------------------------------------------
 const VIEWS = {
   calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView', unit: '#unitView',
-  calculus: '#calculusView', base: '#baseView', complex: '#complexView', phys: '#physView', big: '#bigView',
+  calculus: '#calculusView', base: '#baseView', complex: '#complexView', phys: '#physView', big: '#bigView', prob: '#probView',
 };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
@@ -417,7 +418,8 @@ function applyMode() {
   else if (mode === 'base') showBase();
   else if (mode === 'complex') showComplex();
   else if (mode === 'phys') showPhys();
-  else showBig();
+  else if (mode === 'big') showBig();
+  else showProb();
 }
 
 // ---------------------------------------------------------
@@ -770,6 +772,15 @@ function start() {
     settings: () => settings,
     active: () => currentMode() === 'big',
     // 巨大数の答え（ふつうの数のときだけ）を電卓の式に入れる
+    onUseInCalc(value, label) {
+      useInCalc(value, label);
+      toast('答えを電卓の式に入れました');
+    },
+  });
+  initProb({
+    settings: () => settings,
+    active: () => currentMode() === 'prob',
+    // 確率の答えを電卓の式に入れる（% の答えは 0.5 のような小数で）
     onUseInCalc(value, label) {
       useInCalc(value, label);
       toast('答えを電卓の式に入れました');
