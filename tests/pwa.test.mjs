@@ -47,6 +47,9 @@ test('manifest の内容とアイコン', () => {
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.start_url, './');
   assert.equal(manifest.scope, './');
+  // id は './' や '/' にしない（サイトのいちばん上にそろえられるので、同じ github.io のほかのアプリと
+  // 「同じアプリ」とみなされ、「すでにインストールされています」になる）
+  assert.ok(manifest.id && !['', '.', './', '/'].includes(manifest.id), 'manifest の id');
   for (const icon of manifest.icons) {
     assert.ok(existsSync(join(root, icon.src)), `アイコンがありません: ${icon.src}`);
   }

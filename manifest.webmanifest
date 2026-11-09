@@ -3,7 +3,7 @@
   "short_name": "電卓",
   "description": "誤差の出にくい、スマホ向けの電卓",
   "lang": "ja",
-  "id": "./",
+  "id": "calculator/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

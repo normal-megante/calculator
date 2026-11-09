@@ -76,6 +76,7 @@
 - **計算はすべて自作の `js/num.js`**（BigInt を使った分数と概数）。ふつうの JavaScript の数（Number）は、見積もり以外に使わない。
 - 履歴は **IndexedDB**（`js/db.js`）。いまの式・設定は localStorage（消えても困らないもの）。
 - **PWA 化**：`manifest.webmanifest` と Service Worker（`sw.js`、ネット優先・4秒でしまってある分）。
+  - manifest の `id` は `"calculator/"`。`"./"` にすると、Chrome は id をサイトのいちばん上（`ユーザー名.github.io/`）として読むので、同じ github.io に置いたほかのアプリ（単語帳・ファイルツール箱）と同じアプリとみなされ「すでにインストールされています」になった（2026-11-09 に直した）。
 - すべてのパスは相対パス（`/` で始めない）。公開先が `/calculator/` の下になるので。キャッシュ名は `calculator-` で始める。
 
 ### 数のしくみ（js/num.js）
