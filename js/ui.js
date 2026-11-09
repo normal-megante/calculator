@@ -2,7 +2,7 @@
 // 画面の小道具（式の表示・お知らせ・振動など、いくつかの画面で使うもの）
 // =========================================================
 import * as N from './num.js';
-import { isDigit, isRef, openParens, isFnToken } from './calc.js';
+import { isDigit, isRef, isVar, openParens, isFnToken } from './calc.js';
 
 export const $ = (selector) => document.querySelector(selector);
 
@@ -13,6 +13,8 @@ function classOf(t) {
   if (['√', '%', '²', '!', '⁻¹'].includes(t)) return 'tk fn';
   if (isFnToken(t)) return 'tk func';
   if (t === 'π' || t === 'e') return 'tk konst';
+  if (isVar(t)) return 'tk var';
+  if (t === '∞') return 'tk inf';
   return 'tk';
 }
 

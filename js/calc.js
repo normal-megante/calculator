@@ -6,6 +6,7 @@
 //   ・関数電卓の部品 … 'sin(' などの関数（「(」もかねる）、'π' 'e'、'!' '⁻¹'（後ろにつく）、
 //                       'C' 'P'（nCr・nPr）
 //   ・{ ref: 数, label: 表示名 } … 前の答えや履歴の答え（全部の桁を持ったまま式に入る）
+//   ・'x' 'k' … 変数（微分・積分・Σ・lim の式。compile で木にして evalTree で x の値を入れて計算）
 //
 // 計算のきまり（ふつうのスマホの電卓と同じ）
 //   ・× ÷ を先に、＋ − をあとで計算する。( ) の中が先。
@@ -26,7 +27,7 @@ const { CalcError } = N;
 const HUNDRED = N.frac(100n);
 
 // ASCII の記号も受け付ける（PC のキーボードや貼り付け用）
-const ALIASES = { '-': '−', '*': '×', '/': '÷', 'x': '×', '＋': '+', 'ー': '−', '－': '−' };
+const ALIASES = { '-': '−', '*': '×', '/': '÷', '＋': '+', 'ー': '−', '－': '−' };
 
 export function normalizeChar(ch) {
   return ALIASES[ch] ?? ch;
@@ -56,6 +57,10 @@ export function isRef(t) {
   return typeof t === 'object' && t !== null && 'ref' in t;
 }
 
+// 変数（微分・積分・lim は x、Σ は k）
+export const isVar = (t) => t === 'x' || t === 'k';
+export const usesVar = (items) => items.some(isVar);
+
 // ---------------------------------------------------------
 // 部品の並び → 記号（トークン）の並び
 // ---------------------------------------------------------
@@ -76,6 +81,11 @@ export function lex(items) {
     }
     if (t === 'π' || t === 'e') {
       out.push({ type: 'num', value: t === 'π' ? S.PI : S.E, konst: true, at: i });
+      i++;
+      continue;
+    }
+    if (isVar(t)) {
+      out.push({ type: 'var', value: t, at: i });
       i++;
       continue;
     }
@@ -148,7 +158,7 @@ class Parser {
       if (t?.type === 'op' && (t.value === '×' || t.value === '÷')) {
         this.i++;
         a = { t: 'mul', op: t.value, a, b: this.perm() };
-      } else if (t && (t.type === 'num' || t.type === 'lp' || t.type === 'sqrt' || t.type === 'fn')) {
+      } else if (t && (t.type === 'num' || t.type === 'lp' || t.type === 'sqrt' || t.type === 'fn' || t.type === 'var')) {
         a = { t: 'mul', op: '·', a, b: this.power() };
       } else {
         return a;
@@ -211,6 +221,8 @@ class Parser {
     switch (t.type) {
       case 'num':
         return { t: 'num', v: t.value };
+      case 'var':
+        return { t: 'var', name: t.value };
       case 'lp': {
         if (this.peek()?.type === 'rp') throw new CalcError('( ) の中が空です', 'syntax');
         const a = this.sum();
@@ -264,6 +276,9 @@ function evaluateNode(node, ctx) {
   switch (node.t) {
     case 'num':
       return node.v;
+    case 'var':
+      if (!ctx.x) throw new CalcError(`${node.name} は、ここでは使えません`, 'syntax');
+      return ctx.x;
     case 'group': {
       const v = evaluateNode(node.a, ctx);
       node.step = node.a.step;
@@ -379,6 +394,18 @@ export function evaluate(items, { angle = S.getAngle() } = {}) {
   const ctx = { notes: [], steps: [], angle };
   const value = evaluateNode(tree, ctx);
   return { value, notes: ctx.notes, steps: ctx.steps };
+}
+
+// 変数の入った式を、計算の木にしておく（x の値を変えて何度も計算するとき。閉じていない ( は閉じる）
+export function compile(items) {
+  const tokens = lex(items);
+  for (let k = openParens(items); k > 0; k--) tokens.push({ type: 'rp', value: ')', at: items.length });
+  return parse(tokens);
+}
+
+// 計算の木を、x に値を入れて計算する（ステップや注意書きは残さない）
+export function evalTree(tree, { x = null, angle = S.getAngle() } = {}) {
+  return evaluateNode(tree, { notes: [], steps: [], angle, x });
 }
 
 // 閉じていない ( を閉じた式（＝ のあと、履歴に残す形）

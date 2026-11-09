@@ -23,6 +23,7 @@
         <button type="button" role="tab" data-mode="time" aria-selected="false">時間</button>
         <button type="button" role="tab" data-mode="date" aria-selected="false">日付</button>
         <button type="button" role="tab" data-mode="unit" aria-selected="false">単位</button>
+        <button type="button" role="tab" data-mode="calculus" aria-selected="false">微積分</button>
       </nav>
       <button type="button" class="bar-btn" id="btnHistory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /><path d="M12 8v4l3 2" /></svg>
@@ -465,6 +466,86 @@
         <button type="button" data-k="swap" class="k eq" aria-label="打つ単位と答えの単位を入れかえる">⇄</button>
       </section>
     </div>
+
+    <!-- 微分・積分・Σ・lim -->
+    <div class="view cu" id="calculusView" hidden>
+      <div class="subtabs" id="cuTabs" role="tablist" aria-label="微分・積分・Σ・lim">
+        <button type="button" role="tab" data-kind="diff" aria-selected="true">微分</button>
+        <button type="button" role="tab" data-kind="int" aria-selected="false">積分</button>
+        <button type="button" role="tab" data-kind="sum" aria-selected="false">Σ</button>
+        <button type="button" role="tab" data-kind="lim" aria-selected="false">lim</button>
+      </div>
+      <div class="shop-pane cu-pane">
+        <section class="shop-sum cu-card" id="cuCard" aria-label="答え" aria-live="polite">
+          <div class="sum-top">
+            <span class="sum-count" id="cuCount"></span>
+            <button type="button" class="check-btn" id="btnCuToCalc" hidden>電卓で使う</button>
+            <button type="button" class="check-btn" id="btnCuCheck" hidden>✓ 検算</button>
+          </div>
+          <div class="cu-row">
+            <span class="cu-label" id="cuLabel"></span>
+            <button type="button" class="sum-total u-main cu-main" id="cuMain" aria-label="答え（タップでくわしい表示）"></button>
+          </div>
+          <div class="sum-tax cu-sub" id="cuSub"></div>
+        </section>
+        <div class="cu-notes" id="cuNotes"></div>
+      </div>
+
+      <section class="entry cu-entry" aria-label="式と範囲">
+        <button type="button" class="fld cu-fld cu-f" data-cfield="f"><small class="lbl">f(x) ＝</small><span class="cu-ex expr"></span></button>
+        <div class="cu-args">
+          <button type="button" class="fld cu-fld" data-cfield="a"><small class="lbl">x ＝</small><span class="cu-ex expr"></span></button>
+          <button type="button" class="fld cu-fld" data-cfield="lo"><small class="lbl">下端</small><span class="cu-ex expr"></span></button>
+          <button type="button" class="fld cu-fld" data-cfield="hi"><small class="lbl">上端</small><span class="cu-ex expr"></span></button>
+          <button type="button" class="fld cu-fld" data-cfield="at"><small class="lbl">x →</small><span class="cu-ex expr"></span></button>
+          <div class="cu-opts" id="cuOpts"></div>
+        </div>
+        <p class="entry-hint"><span id="cuHint"></span></p>
+      </section>
+
+      <section class="keypad cu-keys" id="cuKeys" aria-label="微積分のキー">
+        <button type="button" data-k="var" class="k unit cu-var" aria-label="変数（x、Σ では k）">x</button>
+        <button type="button" data-k="sin" class="k fn">sin</button>
+        <button type="button" data-k="cos" class="k fn">cos</button>
+        <button type="button" data-k="tan" class="k fn">tan</button>
+        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
+
+        <button type="button" data-k="π" class="k fn">π</button>
+        <button type="button" data-k="e" class="k fn">e</button>
+        <button type="button" data-k="ln" class="k fn">ln</button>
+        <button type="button" data-k="log" class="k fn">log</button>
+        <button type="button" data-k="clear" class="k fn danger" aria-label="この欄を全部消す">AC</button>
+
+        <button type="button" data-k="(" class="k fn">(</button>
+        <button type="button" data-k="7" class="k num">7</button>
+        <button type="button" data-k="8" class="k num">8</button>
+        <button type="button" data-k="9" class="k num">9</button>
+        <button type="button" data-k="÷" class="k op">÷</button>
+
+        <button type="button" data-k=")" class="k fn">)</button>
+        <button type="button" data-k="4" class="k num">4</button>
+        <button type="button" data-k="5" class="k num">5</button>
+        <button type="button" data-k="6" class="k num">6</button>
+        <button type="button" data-k="×" class="k op">×</button>
+
+        <button type="button" data-k="^" class="k fn" aria-label="累乗">x<sup>y</sup></button>
+        <button type="button" data-k="1" class="k num">1</button>
+        <button type="button" data-k="2" class="k num">2</button>
+        <button type="button" data-k="3" class="k num">3</button>
+        <button type="button" data-k="−" class="k op">−</button>
+
+        <button type="button" data-k="√" class="k fn">√</button>
+        <button type="button" data-k="0" class="k num">0</button>
+        <button type="button" data-k="." class="k num">.</button>
+        <button type="button" data-k="!" class="k fn" aria-label="階乗">n!</button>
+        <button type="button" data-k="+" class="k op">+</button>
+
+        <button type="button" data-k="left" class="k move" aria-label="カーソルを左へ">◀</button>
+        <button type="button" data-k="right" class="k move" aria-label="カーソルを右へ">▶</button>
+        <button type="button" data-k="inf" class="k fn" aria-label="無限大（もう一度でマイナス無限大）">∞</button>
+        <button type="button" data-k="next" class="k eq" aria-label="次の欄へ">次へ</button>
+      </section>
+    </div>
   </div>
 
   <!-- 履歴 -->
@@ -688,6 +769,16 @@
         <li>打つ数の単位は、欄の下のボタンでえらびます。一覧の単位をタップすると、その単位が上の「答え」になります。⇄ で入れかえ（答えを打った数に）。</li>
         <li>単位の大きさは分数のまま持っているので、誤差は出ません（1坪 ＝ 400/121 m²）。割り切れない答えは12桁で四捨五入して「…」を付けます。答えをタップすると全部の桁が見られます。</li>
         <li>畳・カップ・合などは、国や地方で大きさがちがいます。一覧の単位の下に、どの大きさで計算しているかを書いています。</li>
+      </ul>
+      <h3>微分・積分・Σ・lim</h3>
+      <ul>
+        <li>上の「微積分」で、x の式（Σ は k の式）を打ちます。下の欄（x の値・下端・上端など）は、タップするか「次へ」でえらびます。打つと少し待ってから答えが出ます（＝ はありません）。</li>
+        <li><b>微分</b>：その x でのグラフの傾き f'(a)。<b>積分</b>：下端から上端までの面積（x 軸より下はマイナス）。<b>Σ</b>：k をはじめから終わりまで1ずつ変えて足した和。<b>lim</b>：x を近づけたときに f(x) が近づく値。</li>
+        <li>x の多項式（x³ − 2x など）は、公式でちょうどの値と式（f'(x)、原始関数、和の公式）を出します。sin・e^x などは、式のまま（テイラー展開）か、数値で計算して「上から〇桁は正しいはず」を出します。</li>
+        <li>∞ キーで ∞（もう一度押すと −∞）。積分の下端・上端、Σ の終わり、lim の近づける先で使えます。</li>
+        <li>角度は rad（微分・積分では、ふつうこちら）。式に sin などがあるときは「角度」のボタンで度に切りかえられます（電卓の角度とは別）。</li>
+        <li>「✓ 検算」は、差の商（微分）・細い長方形（積分）・途中までの和（Σ）・x を近づけた表（lim）など、別の方法で計算して答えに近づくかを見せます。</li>
+        <li>数値の計算は、なめらかでない式・ふれ続ける式などで、まちがえたり計算できなかったりすることがあります。</li>
       </ul>
       <p class="hint">履歴やいまの式、お買い物の品物、割り勘・時給の中身は、このスマホの中（ブラウザ）にだけ保存されます。</p>
       <p class="hint" id="aboutVersion"></p>

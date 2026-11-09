@@ -6,13 +6,13 @@
 //
 // カーソルは式の途中にも置けるので、途中の数字を消したり足したりできる。
 // =========================================================
-import { isDigit, isRef, openParens, BINARY_OPS, isFnToken } from './calc.js';
+import { isDigit, isRef, isVar, openParens, BINARY_OPS, isFnToken } from './calc.js';
 
 const isBinary = (t) => typeof t === 'string' && BINARY_OPS.includes(t);
 const isNumberPart = (t) => isDigit(t) || t === '.';
 // 「数の終わり」として後ろに演算子や % をつけられるもの
 const endsValue = (t) => isDigit(t) || t === '.' || t === ')' || t === '%' || t === '²'
-  || t === '!' || t === '⁻¹' || t === 'π' || t === 'e' || isRef(t);
+  || t === '!' || t === '⁻¹' || t === 'π' || t === 'e' || isVar(t) || isRef(t);
 // そのすぐ後ろに演算子をつけられないもの（「(」や関数の頭）
 const opensGroup = (t) => t === '(' || t === '√' || isFnToken(t);
 
@@ -98,6 +98,8 @@ export function pressKey(state, key) {
     case '(':
     case 'π':
     case 'e':
+    case 'x':
+    case 'k':
       return insert(state, [key]);
     // 10ˣ と eˣ：「10^(」「e^(」を入れる（数字のすぐ後ろなら × をはさむ。210 にならないように）
     case 'pow10':

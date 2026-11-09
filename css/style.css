@@ -1089,3 +1089,68 @@ button.ghost.mini { min-height: 34px; padding: 0 12px; font-size: 13px; }
 }
 #unitKeys [data-k="swap"] { font-size: 24px; }
 #unitKeys [data-k="neg"] { font-size: 22px; }
+
+/* =========================================================
+   微分・積分・Σ・lim
+   ========================================================= */
+.cu-pane { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 6px; }
+.cu-card { transition: opacity 0.15s; }
+.cu-card.stale { opacity: 0.5; }
+.cu-card .sum-top { min-height: 30px; }
+.cu-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-height: 44px; }
+.cu-label {
+  flex: 0 1 auto;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cu-main { flex: 1 1 0; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-align: right; }
+.cu-main:disabled { cursor: default; }
+.cu-main.muted { color: var(--muted); }
+.cu-main.error { flex-basis: 100%; color: var(--danger); font-size: 15px !important; font-weight: 600; line-height: 1.45; white-space: normal; }
+.cu-sub { margin-top: 2px; word-break: break-all; }
+.cu-notes { padding: 6px 4px 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.cu-notes p { margin: 0 0 3px; }
+.cu-notes .warn { color: var(--danger); }
+
+.cu-entry { padding-top: 6px; }
+.cu-fld { align-items: center; min-height: 44px; padding: 2px 10px; }
+.fld.cu-fld small:first-child { align-self: center; margin-right: 6px; white-space: nowrap; }
+.cu-f { width: 100%; }
+.cu-ex.expr {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  font-size: 22px;
+  line-height: 1.35;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  text-align: right;
+  cursor: pointer;
+}
+.cu-ex::-webkit-scrollbar { display: none; }
+.cu-fld.fresh .cu-ex { background: var(--ref-bg); border-radius: 4px; }
+.cu-args { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; }
+.cu-args .fld { flex: 1 1 96px; }
+.cu-opts { flex: none; display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.cu-opts .seg button { padding: 0 8px; font-size: 13px; }
+.cu-opts .opts-text { font-size: 12.5px; }
+.cu-angle { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.expr .tk.var { font-style: italic; }
+
+.cu-keys { grid-template-rows: repeat(7, 1fr); gap: 6px; height: min(46dvh, 392px); padding-top: 6px; }
+.cu-keys .k { font-size: 20px; border-radius: 13px; }
+.cu-keys .k.num { font-size: 23px; }
+.cu-keys .k.op { font-size: 26px; }
+.cu-keys .k.fn { font-size: 18px; }
+.cu-keys .k.move { font-size: 16px; }
+.cu-keys .k.unit { font-size: 23px; font-style: italic; }
+.cu-keys .k.eq { grid-column: span 2; font-size: 20px; }
+.cu-keys [data-k="inf"] { font-size: 24px; }
