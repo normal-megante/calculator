@@ -6,12 +6,15 @@
 //
 // カーソルは式の途中にも置けるので、途中の数字を消したり足したりできる。
 // =========================================================
-import { isDigit, isRef, openParens, BINARY_OPS } from './calc.js';
+import { isDigit, isRef, openParens, BINARY_OPS, isFnToken } from './calc.js';
 
 const isBinary = (t) => typeof t === 'string' && BINARY_OPS.includes(t);
 const isNumberPart = (t) => isDigit(t) || t === '.';
 // 「数の終わり」として後ろに演算子や % をつけられるもの
-const endsValue = (t) => isDigit(t) || t === '.' || t === ')' || t === '%' || t === '²' || isRef(t);
+const endsValue = (t) => isDigit(t) || t === '.' || t === ')' || t === '%' || t === '²'
+  || t === '!' || t === '⁻¹' || t === 'π' || t === 'e' || isRef(t);
+// そのすぐ後ろに演算子をつけられないもの（「(」や関数の頭）
+const opensGroup = (t) => t === '(' || t === '√' || isFnToken(t);
 
 // カーソルのところにある数（数字と小数点のかたまり）の範囲
 function numberRunAround(items, caret) {
@@ -67,9 +70,11 @@ export function pressKey(state, key) {
     case '+':
     case '×':
     case '÷':
-    case '^': {
+    case '^':
+    case 'C':
+    case 'P': {
       if (caret === 0) return null;
-      if (prev === '(' || prev === '√') return null;
+      if (opensGroup(prev)) return null;
       if (isBinary(prev)) {
         // 「5×−」のあとに＋なら、2つとも置きかえて「5＋」
         const n = prev === '−' && isBinary(prev2) ? 2 : 1;
@@ -85,11 +90,20 @@ export function pressKey(state, key) {
     }
     case '%':
     case '²':
+    case '!':
+    case '⁻¹':
       if (!endsValue(prev)) return null;
       return insert(state, [key]);
     case '√':
     case '(':
+    case 'π':
+    case 'e':
       return insert(state, [key]);
+    // 10ˣ と eˣ：「10^(」「e^(」を入れる（数字のすぐ後ろなら × をはさむ。210 にならないように）
+    case 'pow10':
+      return insert(state, [...(isNumberPart(prev) ? ['×'] : []), '1', '0', '^', '(']);
+    case 'exp':
+      return insert(state, ['e', '^', '(']);
     case ')':
       if (openParens(items, caret) === 0) return null;
       if (!endsValue(prev)) return null;
@@ -104,6 +118,7 @@ export function pressKey(state, key) {
     case 'clear':
       return items.length ? { items: [], caret: 0 } : null;
     default:
+      if (isFnToken(key)) return insert(state, [key]); // sin( など
       return null;
   }
 }

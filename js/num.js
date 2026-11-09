@@ -471,7 +471,7 @@ function expFixed(Y, wp, p) {
   return approx(sum, K - BigInt(wp), p);
 }
 
-// e^x と ln x（関数電卓のステップで使う予定。いまは累乗の中で使う）
+// e^x と ln x
 export function exp(x, p = P) {
   if (isZero(x)) return ONE;
   const intDigits = Math.max(1, Math.ceil(approxLog10(absNum(x))) + 1);
@@ -492,6 +492,127 @@ export function ln(x, p = P) {
   const wp = p + 20 + extra;
   const L = lnFixed(toApprox(x, wp), wp);
   return approx(L, BigInt(-wp), p);
+}
+
+// ---------------------------------------------------------
+// 円周率と三角関数（関数電卓。これも固定小数点で計算する）
+// ---------------------------------------------------------
+
+// atan(1/n) を級数で：1/n − 1/(3n³) + 1/(5n⁵) − …
+function atanInvFixed(n, S) {
+  const n2 = n * n;
+  let term = S / n;
+  let sum = term;
+  for (let k = 1n; ; k++) {
+    term /= n2;
+    if (term === 0n) return sum;
+    const t = term / (2n * k + 1n);
+    sum += k % 2n === 1n ? -t : t;
+  }
+}
+
+// π = 16 atan(1/5) − 4 atan(1/239)（マチンの式）
+function piFixed(wp) {
+  return constantFixed('pi', wp, (w) => {
+    const S = pow10(w);
+    return 16n * atanInvFixed(5n, S) - 4n * atanInvFixed(239n, S);
+  });
+}
+
+export function pi(p = P) {
+  const wp = p + 10;
+  return approx(piFixed(wp), BigInt(-wp), p);
+}
+
+// sin と cos（X はラジアンの固定小数点、|X| ≦ π/4）をテイラー級数で
+function sinCosFixed(X, S) {
+  const X2 = (X * X) / S;
+  let s = X;
+  let c = S;
+  let ts = X;
+  let tc = S;
+  for (let i = 1n; ts !== 0n || tc !== 0n; i++) {
+    ts = -(ts * X2) / (S * (2n * i) * (2n * i + 1n));
+    tc = -(tc * X2) / (S * (2n * i - 1n) * (2n * i));
+    s += ts;
+    c += tc;
+  }
+  return { s, c };
+}
+
+// 回転の割合 t（1 ＝ 1回転）の、1 未満の部分 × 10^wp（0 以上 10^wp 未満）
+function turnFixed(t, wp) {
+  const S = pow10(wp);
+  if (t.q) return ((((t.n % t.d) + t.d) % t.d) * S) / t.d;
+  const k = t.e + BigInt(wp);
+  const scaled = k >= 0n ? t.m * pow10(k) : divRound(t.m, pow10(-k));
+  return ((scaled % S) + S) % S;
+}
+
+// 角度を「回転の割合」t（1 ＝ 360° ＝ 2π）で受け取って、sin と cos を p 桁の概数で
+//   45° ごとに区切り、区切りの中の 45° 未満の角度にして級数で計算する
+export function sinCosTurn(t, p = P) {
+  let wp = p + 20;
+  for (let attempt = 0; ; attempt++) {
+    const S = pow10(wp);
+    const R = turnFixed(t, wp);
+    const eighth = S / 8n;
+    const k = R / eighth;          // 0〜7（どの 45° の区切りか）
+    const PI = piFixed(wp);
+    let X = ((R - k * eighth) * 2n * PI) / S;
+    const odd = k % 2n === 1n;
+    if (odd) X = PI / 4n - X;       // 45°〜90° の区切りは、90° から引いて小さくする
+    let { s, c } = sinCosFixed(X, S);
+    if (odd) [s, c] = [c, s];
+    const j = k / 2n;              // 90° を何回まわすか
+    const [sin, cos] = j === 0n ? [s, c] : j === 1n ? [c, -s] : j === 2n ? [-s, -c] : [-c, s];
+    // 0 に近い答えは、上の桁が 0 になって桁が足りなくなるので、桁を増やしてやり直す
+    const lost = wp - Math.min(digitLen(sin) || 1, digitLen(cos) || 1);
+    if (lost > 15 && attempt < 3) {
+      wp += lost;
+      continue;
+    }
+    return { sin: approx(sin, BigInt(-wp), p), cos: approx(cos, BigInt(-wp), p) };
+  }
+}
+
+// atan（X は固定小数点）→ ラジアンの固定小数点
+function atanFixed(X, S, wp) {
+  const negative = X < 0n;
+  if (negative) X = -X;
+  let inverse = false;
+  if (X > S) {
+    X = divRound(S * S, X); // atan(x) ＝ π/2 − atan(1/x)
+    inverse = true;
+  }
+  let doubled = 0;
+  while (X * 10n > S) {
+    // atan(x) ＝ 2 atan(x / (1 + √(1 + x²)))：0.1 以下になるまで小さくする
+    X = divRound(X * S, S + isqrt(S * S + X * X));
+    doubled++;
+  }
+  const X2 = (X * X) / S;
+  let term = X;
+  let sum = X;
+  for (let k = 1n; ; k++) {
+    term = (term * X2) / S;
+    if (term === 0n) break;
+    const t = term / (2n * k + 1n);
+    sum += k % 2n === 1n ? -t : t;
+  }
+  sum <<= BigInt(doubled);
+  if (inverse) sum = piFixed(wp) / 2n - sum;
+  return negative ? -sum : sum;
+}
+
+// atan x（答えはラジアン）
+export function atan(x, p = P) {
+  if (isZero(x)) return ZERO;
+  const lg = approxLog10(absNum(x));
+  const extra = lg < 0 ? Math.ceil(-lg) : 0; // 小さい数は、その分だけ桁を増やす
+  const wp = p + 20 + extra;
+  const S = pow10(wp);
+  return approx(atanFixed(mulFixed(x, S), S, wp), BigInt(-wp), p);
 }
 
 // ---------------------------------------------------------

@@ -181,3 +181,59 @@ test('表示：万・億・兆の読み方', () => {
   assert.equal(F.japaneseReading(N.frac(10n ** 72n)).over, true);
   assert.equal(F.japaneseReading(N.frac(-50000n)).text, 'マイナス 5万');
 });
+
+// ---- 関数電卓（ステップ8） ----
+// 部品の並びを直接書く（'sin(' などは1つの部品）
+const run = (list, angle = 'deg') => F.compact(evaluate(list, { angle }).value, 20).text;
+
+test('関数：sin・log・π・!・nCr', () => {
+  assert.equal(run(['sin(', '3', '0']), '0.5');
+  assert.equal(run(['sin(', '3', '0', ')', '+', 'cos(', '6', '0', ')']), '1');
+  assert.equal(run(['2', 'sin(', '3', '0']), '1');                      // 2sin(30) は かけ算
+  assert.equal(run(['sin(', 'π', '÷', '6'], 'rad'), '0.5');
+  assert.equal(run(['asin(', '0', '.', '5']), '30');
+  assert.equal(run(['log(', '1', '0', '0', '0']), '3');
+  assert.equal(run(['1', '0', '^', '(', '3']), '1,000');
+  assert.equal(run(['5', '!']), '120');
+  assert.equal(run(['3', '!', '!']), '720');
+  assert.equal(run(['5', 'C', '2']), '10');
+  assert.equal(run(['2', '×', '5', 'C', '2']), '20');                   // nCr は × より先
+  assert.equal(run(['5', 'P', '2', '+', '1']), '21');
+  assert.equal(run(['4', '⁻¹']), '0.25');
+  assert.equal(run(['2', 'π']), F.compact(N.mul(N.frac(2n), N.pi()), 20).text);
+  assert.throws(() => evaluate(['tan(', '9', '0']), /値がありません/);
+  assert.throws(() => evaluate(['sin(', ')']), /中が空/);
+});
+
+test('関数：角度のモードと注意書き・計算の順番', () => {
+  const r = evaluate(['sin(', '3', '0', ')', '×', '2'], { angle: 'deg' });
+  assert.deepEqual(r.notes, [{ kind: 'angle', angle: 'deg' }]);
+  assert.deepEqual(r.steps.map((s) => s.op), ['sin', '×']);
+  assert.equal(r.steps[0].angle, 'deg');
+  assert.equal(evaluate(['5', 'C', '2'], { angle: 'rad' }).notes.length, 0);
+  assert.notEqual(run(['sin(', '3', '0'], 'rad'), '0.5');
+});
+
+test('関数：＝なしの答え', () => {
+  assert.equal(F.compact(preview(['sin(', '3', '0'], { angle: 'deg' }).value).text, '0.5');
+  assert.equal(preview(['sin(']), null);
+  assert.equal(preview(['5', 'C']), null);                                  // 数1つだけなら出さない
+  assert.equal(F.compact(preview(['5', 'C', '2', '×'], { angle: 'deg' }).value).text, '10');
+  assert.ok(preview(['π']).value);                                     // π だけでも答えを出す
+  assert.equal(preview(['3', '!', '×'], { angle: 'deg' }).value.n, 6n);
+  assert.match(preview(['(', '−', '1', ')', '!']).error, /0 以上の整数/);
+});
+
+test('キー：関数の部品', () => {
+  const press = (keys) => keys.reduce((s, k) => pressKey(s, k) ?? s, { items: [], caret: 0 });
+  assert.deepEqual(press(['sin(', '3', '0', ')']).items, ['sin(', '3', '0', ')']);
+  assert.equal(pressKey({ items: ['sin('], caret: 1 }, '×'), null);      // sin( のすぐ後に × は入らない
+  assert.equal(pressKey({ items: [], caret: 0 }, '!'), null);
+  assert.deepEqual(press(['5', '!']).items, ['5', '!']);
+  assert.deepEqual(press(['5', 'C', 'P']).items, ['5', 'P']);            // 演算子の連打は置きかえ
+  assert.deepEqual(press(['2', 'pow10']).items, ['2', '×', '1', '0', '^', '(']);
+  assert.deepEqual(press(['pow10']).items, ['1', '0', '^', '(']);
+  assert.deepEqual(press(['exp']).items, ['e', '^', '(']);
+  assert.deepEqual(press(['sin(', 'back']).items, []);                   // sin( はまとめて消える
+  assert.deepEqual(press(['log(', '5', ')', ')']).items, ['log(', '5', ')']); // 閉じる ( がなければ ) は入らない
+});

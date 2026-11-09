@@ -8,14 +8,21 @@
 //       抜けた数・増えた数も見つけられるように、いちばん長く一致する並べ方でくらべる。
 // =========================================================
 import * as N from './num.js';
+import * as S from './sci.js';
 import { isDigit, isRef } from './calc.js';
 
 const HUNDRED = N.frac(100n);
+const TEN = N.frac(10n);
+const INVERSE = { sin: 'asin', cos: 'acos', tan: 'atan' };
+const FORWARD = { asin: 'sin', acos: 'cos', atan: 'tan' };
 
 // ---------------------------------------------------------
 // 逆算
 // 返す値：{ op: 逆の計算の記号, x, y, value: 逆算の答え, expect: 戻るはずの数, ok, approx }
 //         または { none: 逆算できない理由 }
+//   関数電卓：sin → sin⁻¹（角度がちがっても sin が同じなら ✓。same はぴったり同じか）、
+//             sin⁻¹ → sin、log → 10^、ln → e^、n! → ÷n で (n−1)!、
+//             nCr → ×r!×(n−r)! で n!、nPr → ×(n−r)! で n!、x⁻¹ → 1÷
 // ---------------------------------------------------------
 function isEvenInteger(x) {
   return N.isInteger(x) && x.n % 2n === 0n;
@@ -50,6 +57,42 @@ function reverseRaw(s) {
       // 2乗・4乗…では、もとの数のマイナスは消える
       return { op: 'root', x: s.result, y: s.b, value, expect: isEvenInteger(s.b) ? N.absNum(s.a) : s.a };
     }
+    case 'sin': case 'cos': case 'tan': {
+      const value = S[INVERSE[s.op]](s.result, s.angle);
+      const ok = S.sameTrig(s.op, s.a, value, s.angle);
+      return { op: INVERSE[s.op], x: s.result, value, expect: s.a, ok, same: N.cmp(value, s.a) === 0, angle: s.angle, fn: s.op };
+    }
+    case 'asin': case 'acos': case 'atan':
+      return { op: FORWARD[s.op], x: s.result, value: S[FORWARD[s.op]](s.result, s.angle), expect: s.a, angle: s.angle };
+    case 'log':
+      return { op: 'pow10', x: s.result, value: N.pow(TEN, s.result), expect: s.a };
+    case 'ln':
+      return { op: 'exp', x: s.result, value: N.exp(s.result), expect: s.a };
+    case '!': {
+      const n = S.intOf(s.a);
+      if (n === 0n) return { none: '0! は 1 ときまっているので、逆算するものはありません' };
+      const k = N.frac(n - 1n);
+      return { op: 'fact', x: s.result, y: s.a, k, value: N.div(s.result, s.a), expect: S.factorial(k) };
+    }
+    // nCr × r! ＝ nPr（nCr は「並べ方 nPr を、同じ組の並べかえ r! で割ったもの」だから）
+    case 'C':
+      return { op: 'C', x: s.result, n: s.a, r: s.b, value: N.mul(s.result, S.factorial(s.b)), expect: S.nPr(s.a, s.b) };
+    // nPr × (n−r)! ＝ n!（n! が大きすぎて出せないときは nPr ÷ n ＝ (n−1)P(r−1)）
+    case 'P': {
+      const n = S.intOf(s.a);
+      const r = S.intOf(s.b);
+      if (r === 0n) return { none: 'nP0 は 1 ときまっているので、逆算するものはありません' };
+      const rest = N.frac(n - r);
+      try {
+        return { op: 'P', x: s.result, n: s.a, rest, value: N.mul(s.result, S.factorial(rest)), expect: S.factorial(s.a) };
+      } catch {
+        const n1 = N.frac(n - 1n);
+        const r1 = N.frac(r - 1n);
+        return { op: 'P÷', x: s.result, n: s.a, n1, r1, value: N.div(s.result, s.a), expect: S.nPr(n1, r1) };
+      }
+    }
+    case '⁻¹':
+      return { op: '÷', x: N.ONE, y: s.result, value: N.div(N.ONE, s.result), expect: s.a };
     default:
       return { none: 'この計算は逆算できません' };
   }
@@ -63,7 +106,7 @@ export function reverseStep(step) {
     return { none: 'この計算は逆算できません' };
   }
   if (r.none) return r;
-  const ok = N.cmp(r.value, r.expect) === 0;
+  const ok = r.ok ?? N.cmp(r.value, r.expect) === 0;
   return { ...r, ok, approx: !r.value.q || !r.expect.q };
 }
 

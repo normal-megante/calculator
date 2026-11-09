@@ -175,6 +175,7 @@ button { font: inherit; color: inherit; }
 }
 .expr .tk.op { color: var(--accent); margin: 0 0.06em; }
 .expr .tk.paren, .expr .tk.fn { color: var(--muted); }
+.expr .tk.func { color: var(--muted); font-size: 0.82em; }
 .expr .tk.ref {
   display: inline-block;
   padding: 0 0.25em;
@@ -253,6 +254,32 @@ button { font: inherit; color: inherit; }
   cursor: pointer;
 }
 .check-btn[hidden] { display: none; }
+/* 「関数」：関数のキーを出す・しまう */
+.sci-toggle {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.sci-toggle[aria-pressed="true"] { border-color: var(--chip-on); background: var(--chip-on); color: var(--chip-on-text); }
+
+/* 分数の答え（上が分子、下が分母） */
+.fr {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  font-size: 0.6em;
+  line-height: 1.1;
+}
+.fr-n { padding: 0 0.15em; border-bottom: 2px solid currentColor; }
+.fr-d { padding: 0 0.15em; }
+.fr-sign { margin-right: 0.08em; }
 
 /* 照合中のお知らせ（表示のいちばん上） */
 .verify-bar {
@@ -273,6 +300,31 @@ button { font: inherit; color: inherit; }
   background: var(--bad-bg);
   border-radius: 0.15em;
 }
+
+/* ---- 関数のキー（5列×3行。出しているときは、ふつうのキーを少し低く） ---- */
+.sci-pad {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+  height: min(19dvh, 150px);
+  padding: 4px 12px 0;
+}
+.sci-pad[hidden] { display: none; }
+.k.sk {
+  padding: 0;
+  border-radius: 12px;
+  background: var(--key-fn);
+  color: var(--key-fn-text);
+  font-size: 17px;
+  line-height: 1.1;
+}
+.k.sk sup { font-size: 0.65em; }
+.k.sk small { display: block; font-size: 10px; opacity: 0.7; }
+.k.sk[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-text); }
+#calcView.sci .keypad { height: min(44dvh, 360px); gap: 6px; }
+#calcView.sci .display { min-height: 120px; }
 
 /* ---- キー ---- */
 .keypad {
@@ -368,6 +420,7 @@ button { font: inherit; color: inherit; }
 .h-name { font-size: 15px; font-weight: 700; color: var(--text); }
 .h-kind { padding: 1px 8px; border-radius: 10px; background: var(--chip); font-size: 12px; }
 .h-time { margin-left: auto; }
+.h-angle { font-size: 12px; color: var(--muted); }
 .h-expr { margin-top: 4px; font-size: 16px; line-height: 1.4; text-align: right; color: var(--muted); word-break: break-all; }
 .h-expr .tk.ref { padding: 0 0.3em; border-radius: 0.3em; background: var(--ref-bg); color: var(--ref-text); font-size: 0.85em; }
 .h-value { font-size: 22px; font-weight: 600; text-align: right; word-break: break-all; }
@@ -465,6 +518,13 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
 .rev { font-size: 14px; color: var(--muted); }
 .rev .mark.ok { color: var(--ok); font-weight: 700; }
 .rev .mark.ng { color: var(--danger); font-weight: 700; }
+.rev-note { display: block; font-size: 12.5px; }
+
+/* 素因数分解 */
+.fz-main { margin: 4px 0 8px; font-size: 22px; font-weight: 600; line-height: 1.4; word-break: break-all; font-variant-numeric: tabular-nums; user-select: text; -webkit-user-select: text; }
+.fz-divisors { margin: 4px 0; font-size: 14px; line-height: 1.6; word-break: break-all; font-variant-numeric: tabular-nums; user-select: text; -webkit-user-select: text; }
+.mark-ok { color: var(--ok); font-weight: 700; }
+.mark-ng { color: var(--danger); font-weight: 700; }
 .summary { margin: 4px 0; font-weight: 700; }
 .summary.ok, .verdict.ok { color: var(--ok); }
 .summary.ng, .verdict.ng { color: var(--danger); }

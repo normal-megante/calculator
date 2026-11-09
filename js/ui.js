@@ -2,17 +2,23 @@
 // 画面の小道具（式の表示・お知らせ・振動など、いくつかの画面で使うもの）
 // =========================================================
 import * as N from './num.js';
-import { isDigit, isRef, openParens } from './calc.js';
+import { isDigit, isRef, openParens, isFnToken } from './calc.js';
 
 export const $ = (selector) => document.querySelector(selector);
 
 // 部品の見た目の種類
 function classOf(t) {
-  if (['+', '−', '×', '÷', '^'].includes(t)) return 'tk op';
+  if (['+', '−', '×', '÷', '^', 'C', 'P'].includes(t)) return 'tk op';
   if (t === '(' || t === ')') return 'tk paren';
-  if (t === '√' || t === '%' || t === '²') return 'tk fn';
+  if (['√', '%', '²', '!', '⁻¹'].includes(t)) return 'tk fn';
+  if (isFnToken(t)) return 'tk func';
+  if (t === 'π' || t === 'e') return 'tk konst';
   return 'tk';
 }
+
+// 部品の画面での書き方（asin( は sin⁻¹( と書く）
+const SHOW_AS = { 'asin(': 'sin⁻¹(', 'acos(': 'cos⁻¹(', 'atan(': 'tan⁻¹(' };
+export const tokenText = (t) => SHOW_AS[t] ?? t;
 
 // 式（部品の並び）を container の中に表示する。
 // caret が数なら、その位置にカーソルを出す。数字には3桁ごとにカンマを入れる。
@@ -43,7 +49,7 @@ export function renderItems(container, items, { caret = null, ghostParens = fals
       el.textContent = t.label;
     } else {
       el.className = classOf(t);
-      el.textContent = t;
+      el.textContent = tokenText(t);
     }
     if (marks?.has(i)) el.classList.add('bad');
     frag.append(el);

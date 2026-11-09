@@ -10,7 +10,8 @@
 // =========================================================
 import * as N from './num.js';
 import * as F from './format.js';
-import { evaluate, preview, isDigit, closeParens } from './calc.js';
+import * as S from './sci.js';
+import { evaluate, preview, isDigit, isFnToken, closeParens, usesAngle } from './calc.js';
 import { pressKey, insertRef } from './keys.js';
 import {
   $, renderItems, span, caretFromPoint, serializeItems, deserializeItems,
@@ -26,15 +27,16 @@ import { initSplit, showSplit, setSplitTotal } from './split-ui.js';
 import { initTime, showTime } from './time-ui.js';
 import { initDate, showDate } from './date-ui.js';
 import { initUnit, showUnit } from './unit-ui.js';
+import { initSci } from './sci-ui.js';
 
-const VERSION = 'ステップ7（2026-11-09）';
+const VERSION = 'ステップ8（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
   items: [],
   caret: 0,
   mode: 'edit',
-  last: null,   // { items, value, notes } … 最後に ＝ を押した計算
+  last: null,   // { items, value, notes, angle } … 最後に ＝ を押した計算（angle は sin などがあるときだけ）
   error: '',    // ＝ を押したけれど計算できなかったときのお知らせ
   verify: null, // 照合中なら 1回目の計算 { items, value }
 };
@@ -50,7 +52,9 @@ function saveState() {
       items: serializeItems(state.items),
       caret: state.caret,
       mode: state.mode,
-      last: state.last && { items: serializeItems(state.last.items), value: N.serialize(state.last.value) },
+      last: state.last && {
+        items: serializeItems(state.last.items), value: N.serialize(state.last.value), angle: state.last.angle ?? null,
+      },
       verify: state.verify && { items: serializeItems(state.verify.items), value: N.serialize(state.verify.value) },
     }));
   } catch {
@@ -66,9 +70,10 @@ function loadState() {
     state.caret = Math.min(Math.max(0, saved.caret ?? 0), state.items.length);
     if (saved.last) {
       const items = deserializeItems(saved.last.items);
+      const angle = saved.last.angle ?? null;
       let notes = [];
-      try { notes = evaluate(items).notes; } catch { notes = []; }
-      state.last = { items, value: N.deserialize(saved.last.value), notes };
+      try { notes = evaluate(items, { angle: angle ?? S.getAngle() }).notes; } catch { notes = []; }
+      state.last = { items, value: N.deserialize(saved.last.value), notes, angle };
     }
     state.mode = saved.mode === 'done' && state.last ? 'done' : 'edit';
     if (saved.verify) {
@@ -87,6 +92,25 @@ const exprEl = $('#expr');
 const resultEl = $('#result');
 const notesEl = $('#notes');
 const displayEl = $('#display');
+
+// 分数で出すとき（「関数」の 分数）の形。割り切れる数・概数・大きすぎる分数は null
+const MAX_FRAC_SHOW = 40; // 分子と分母あわせて、この桁数まで
+function fractionShown(x) {
+  if (!settings.frac || !x.q || x.d === 1n) return null;
+  const n = x.n < 0n ? -x.n : x.n;
+  if (n.toString().length + x.d.toString().length > MAX_FRAC_SHOW) return null;
+  const sign = x.n < 0n ? '<span class="fr-sign">−</span>' : '';
+  return {
+    html: `${sign}<span class="fr"><span class="fr-n">${F.groupInt(n.toString())}</span><span class="fr-d">${F.groupInt(x.d.toString())}</span></span>`,
+    rounded: false,
+    frac: true,
+  };
+}
+
+function answerForms(x) {
+  const fr = fractionShown(x);
+  return fr ? [fr, ...F.mainForms(x)] : F.mainForms(x);
+}
 
 // 答えを、欄に入る形・大きさで出す
 function fitForms(forms, maxPx, minPx) {
@@ -116,7 +140,7 @@ function fitExpression(maxPx, minPx) {
   exprEl.style.whiteSpace = '';
 }
 
-function noteLines(notes, rounded) {
+function noteLines(notes, form, value) {
   const lines = [];
   for (const note of notes.slice(0, 2)) {
     if (note.kind === 'percent') {
@@ -124,9 +148,20 @@ function noteLines(notes, rounded) {
       const part = F.compact(note.part).text;
       const pct = F.compact(note.percent).text;
       lines.push(`％：${base} の ${pct}%（${part}）を${note.op === '+' ? '足しています' : '引いています'}`);
+    } else if (note.kind === 'angle') {
+      lines.push(`角度は「${S.ANGLE_NAME[note.angle]}」で計算しています${note.angle === 'deg' ? '（360° で1回転）' : '（2π で1回転）'}`);
     }
   }
-  if (rounded) lines.push('四捨五入して出しています（答えをタップで全部の桁）');
+  if (form.frac) {
+    const f = F.fractionForm(value);
+    const dec = F.compact(value, 16);
+    lines.push(`＝ ${dec.text}${dec.rounded ? '…' : ''}${f?.mixed ? `（帯分数 ${f.mixed}）` : ''}`);
+  } else if (settings.frac && value && !N.isInteger(value)) {
+    lines.push(value.q
+      ? '分数：分母が大きいので小数で出しています（答えをタップで分数も）'
+      : '分数：割り切れない数（√2 や π など）は分数にできません');
+  }
+  if (form.rounded) lines.push('四捨五入して出しています（答えをタップで全部の桁）');
   return lines;
 }
 
@@ -151,9 +186,9 @@ function render() {
     const eq = span('eq-sign', ' =');
     renderItems(exprEl, state.last.items, { tail: eq });
     fitExpression(24, 16);
-    const form = fitForms(F.mainForms(state.last.value), 52, 22);
+    const form = fitForms(answerForms(state.last.value), 52, 22);
     shownValue = state.last.value;
-    setNotes(noteLines(state.last.notes, form.rounded));
+    setNotes(noteLines(state.last.notes, form, state.last.value));
   } else {
     // 照合中：ここまで1回目と同じか
     let verifyLine = null;
@@ -184,9 +219,9 @@ function render() {
     } else {
       const p = preview(state.items);
       if (p?.value) {
-        const form = fitForms(F.mainForms(p.value), 30, 18);
+        const form = fitForms(answerForms(p.value), 30, 18);
         shownValue = p.value;
-        setNotes(withVerify(noteLines(p.notes, form.rounded)));
+        setNotes(withVerify(noteLines(p.notes, form, p.value)));
       } else if (p?.error) {
         resultEl.classList.remove('error');
         resultEl.style.fontSize = '18px';
@@ -232,9 +267,9 @@ function handleKey(key, button) {
 
   if (state.mode === 'done') {
     const last = state.last;
-    if (isDigit(key) || ['00', '.', '(', '√'].includes(key)) {
+    if (isDigit(key) || isFnToken(key) || ['00', '.', '(', '√', 'π', 'e', 'pow10', 'exp'].includes(key)) {
       startEditing([]); // 新しい式
-    } else if (['+', '−', '×', '÷', '^', '%', '²', ')'].includes(key)) {
+    } else if (['+', '−', '×', '÷', '^', '%', '²', ')', '!', '⁻¹', 'C', 'P'].includes(key)) {
       startEditing([answerRef(last.value)]); // 答えの続きから
     } else if (key === 'ans') {
       startEditing([answerRef(last.value)]);
@@ -288,14 +323,16 @@ function equals(button) {
     // 閉じていなかった ( は閉じた形で残す
     const items = closeParens(state.items);
     const first = state.verify;
-    state.last = { items, value, notes };
+    // sin などがある式は、どの角度のモードで計算したかも残す
+    const angle = usesAngle(items) ? S.getAngle() : null;
+    state.last = { items, value, notes, angle };
     state.mode = 'done';
     state.error = '';
     state.verify = null;
     if (first) {
       // 照合：1回目とくらべて結果を出す（1回目と同じなら、履歴には増やさない）
       const result = fullCompare(first.items, items);
-      if (!result.same) addHistory(items, value);
+      if (!result.same) addHistory(items, value, { angle });
       render();
       openVerifyResult({
         first,
@@ -307,7 +344,7 @@ function equals(button) {
       });
       return;
     }
-    addHistory(items, value);
+    addHistory(items, value, { angle });
     render();
   } catch (error) {
     if (!(error instanceof N.CalcError)) throw error;
@@ -368,8 +405,15 @@ function stopVerify() {
   render();
 }
 
-function showCheck(items, value, name = '') {
-  openCheck({ items, value, name, onVerify: () => startVerify({ items, value }) });
+function showCheck(items, value, name = '', angle = null) {
+  openCheck({ items, value, name, angle: angle ?? S.getAngle(), onVerify: () => startVerify({ items, value }) });
+}
+
+// 履歴の式の角度のモードが、いまのモードとちがうとき知らせる
+function warnAngle(angle) {
+  if (angle && angle !== S.getAngle()) {
+    toast(`この式は角度「${S.ANGLE_NAME[angle]}」で計算していました（いまは「${S.ANGLE_NAME[S.getAngle()]}」）`);
+  }
 }
 
 // ---------------------------------------------------------
@@ -411,7 +455,7 @@ function setupKeypad() {
   const KEYMAP = {
     Enter: '=', '=': '=', Backspace: 'back', Escape: 'clear', Delete: 'clear',
     ArrowLeft: 'left', ArrowRight: 'right', '*': '×', '/': '÷', '-': '−', '+': '+',
-    '^': '^', '(': '(', ')': ')', '%': '%', '.': '.',
+    '^': '^', '(': '(', ')': ')', '%': '%', '.': '.', '!': '!',
   };
   document.addEventListener('keydown', (event) => {
     if (currentMode() !== 'calc') return;
@@ -444,7 +488,7 @@ function setupDisplay() {
   });
   // ✓ 検算（＝ のあと）
   $('#btnCheck').addEventListener('click', () => {
-    if (state.mode === 'done') showCheck(state.last.items, state.last.value);
+    if (state.mode === 'done') showCheck(state.last.items, state.last.value, '', state.last.angle);
   });
   $('#btnVerifyStop').addEventListener('click', stopVerify);
   // 画面の大きさが変わったら、文字の大きさを合わせ直す
@@ -524,26 +568,49 @@ function useInCalc(value, label) {
   setMode('calc');
 }
 
+// 関数電卓のキー：いまの答え（素因数分解に使う）
+function currentValue() {
+  if (state.mode === 'done') return state.last.value;
+  if (state.items.length === 0) return null;
+  try {
+    return evaluate(state.items).value;
+  } catch {
+    return null;
+  }
+}
+
 function start() {
+  S.setAngle(settings.angle === 'rad' ? 'rad' : 'deg');
   loadState();
   setupInstall();
   setupKeypad();
   setupDisplay();
   setupMenu();
+  initSci({
+    settings: () => settings,
+    saveSetting(patch) {
+      settings = { ...settings, ...patch };
+      saveSettings(settings);
+    },
+    pressKey: (key, button) => handleKey(key, button),
+    currentValue,
+    rerender: () => { if (currentMode() === 'calc') render(); },
+  });
   initHistory({
     // 履歴の「答えを使う」：答えを全部の桁のまま、いまの式のカーソルのところに入れる
     onUseAnswer(value, label) {
       useInCalc(value, label);
     },
     // 履歴の「式を直す」（照合中ならやめる）
-    onEditExpression(items) {
+    onEditExpression(items, angle) {
       state.verify = null;
       startEditing([...items]);
       setMode('calc');
+      warnAngle(angle);
     },
     // 履歴の「検算」
-    onCheck(items, value, name) {
-      showCheck(items, value, name);
+    onCheck(items, value, name, angle) {
+      showCheck(items, value, name, angle);
     },
   });
   initShop({

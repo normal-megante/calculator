@@ -79,7 +79,8 @@ export async function initHistory(h) {
 }
 
 // ＝ を押したとき（お買い物の「履歴に残す」では、種類も付けて）
-export async function addHistory(items, value, { name = '', kind = '' } = {}) {
+//   angle … sin などがある式のときだけ、計算した角度のモード（'deg' / 'rad'）
+export async function addHistory(items, value, { name = '', kind = '', angle = null } = {}) {
   const entry = {
     id: DB.newId(),
     time: Date.now(),
@@ -88,6 +89,7 @@ export async function addHistory(items, value, { name = '', kind = '' } = {}) {
     name,
     kind,
   };
+  if (angle) entry.angle = angle;
   entries.unshift(entry);
   try {
     await store(entry);
@@ -178,6 +180,7 @@ function itemEl(entry) {
   head.className = 'h-head';
   if (entry.name) head.append(span('h-name', entry.name));
   if (entry.kind) head.append(span('h-kind', entry.kind));
+  if (entry.angle) head.append(span('h-angle', entry.angle === 'rad' ? '角度 rad' : '角度 度'));
   head.append(span('h-time', timeText(entry.time)));
 
   const expr = document.createElement('div');
@@ -224,12 +227,12 @@ function onListClick(event) {
       closePanel();
       return;
     case 'edit':
-      handlers.onEditExpression(c.items);
+      handlers.onEditExpression(c.items, entry.angle);
       closePanel();
       return;
     case 'check':
       // 検算の画面は履歴の上に出る（照合をはじめたら、履歴の画面は閉じる：closeHistory）
-      handlers.onCheck(c.items, c.value, entry.name);
+      handlers.onCheck(c.items, c.value, entry.name, entry.angle);
       return;
     case 'name':
       openNameDialog(entry);

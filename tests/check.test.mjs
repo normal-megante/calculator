@@ -89,3 +89,43 @@ test('照合：前の答え（部品）は値でくらべる', () => {
   const ref2 = { ref: N.frac(1n, 3n), label: 'b' };
   assert.equal(fullCompare([ref1, '×', '3'], [ref2, '×', '3']).same, true);
 });
+
+// ---- 関数電卓の逆算（ステップ8） ----
+const lastRev = (list, angle = 'deg') => {
+  const { steps } = evaluate(list, { angle });
+  return reverseStep(steps[steps.length - 1]);
+};
+
+test('逆算：三角関数（角度がちがっても値が同じなら ✓）', () => {
+  const r = lastRev(['sin(', '1', '5', '0']);
+  assert.equal(r.op, 'asin');
+  assert.equal(t(r.value), '30');
+  assert.equal(r.ok, true);
+  assert.equal(r.same, false);                       // 150° と 30° は sin が同じ
+  assert.equal(lastRev(['sin(', '3', '0']).same, true);
+  assert.equal(lastRev(['cos(', '−', '6', '0']).ok, true);
+  assert.equal(lastRev(['tan(', '2', '2', '5']).ok, true);
+  assert.equal(lastRev(['sin(', '2'], 'rad').ok, true);
+  const inv = lastRev(['asin(', '0', '.', '5']);
+  assert.equal(inv.op, 'sin');
+  assert.equal(inv.ok, true);
+  assert.equal(lastRev(['acos(', '0', '.', '3'], 'rad').ok, true);
+});
+
+test('逆算：log・ln・!・nCr・nPr・x⁻¹', () => {
+  assert.equal(lastRev(['log(', '2']).ok, true);
+  assert.equal(lastRev(['ln(', '5']).ok, true);
+  const f = lastRev(['5', '!']);
+  assert.equal(`${t(f.value)} ${t(f.expect)} ${f.ok}`, '24 24 true'); // 120 ÷ 5 = 24 = 4!
+  assert.match(lastRev(['0', '!']).none, /0! は 1/);
+  const c = lastRev(['5', 'C', '2']);
+  assert.equal(`${c.op} ${t(c.value)} ${c.ok}`, 'C 20 true');          // 10 × 2! = 20 = 5P2
+  const p = lastRev(['5', 'P', '2']);
+  assert.equal(`${p.op} ${t(p.value)} ${p.ok}`, 'P 120 true');         // 20 × 3! = 120 = 5!
+  assert.match(lastRev(['5', 'P', '0']).none, /nP0 は 1/);
+  assert.equal(lastRev(['4', '⁻¹']).ok, true);
+  // 大きい数も（概数でも）確かめられる
+  assert.equal(lastRev(['1', '0', '0', '0', '0', '0', 'C', '5', '0', '0', '0', '0']).ok, true);
+  assert.equal(lastRev(['1', '0', '^', '(', '6', '0', ')', 'C', '1', '9', '9', '9']).ok, true);
+  assert.equal(lastRev(['1', '0', '^', '(', '6', '0', ')', 'P', '1', '9', '9', '9']).ok, true);
+});

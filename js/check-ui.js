@@ -5,7 +5,8 @@
 //   openVerifyResult … 照合（もう一度打った）の結果
 // =========================================================
 import * as F from './format.js';
-import { evaluate } from './calc.js';
+import * as S from './sci.js';
+import { evaluate, TRIG } from './calc.js';
 import { reverseStep } from './check.js';
 import { $, renderItems } from './ui.js';
 
@@ -27,12 +28,23 @@ function el(tag, className, text) {
 function numEl(value, fromStep = null) {
   const s = el('span', 'n');
   if (fromStep !== null) s.append(el('span', 'from', label(fromStep)));
-  const f = F.compact(value, 12);
   const v = el('span');
-  v.innerHTML = f.html;
+  if (value === S.PI || value === S.E) v.textContent = value === S.PI ? 'π' : 'e'; // 打った π・e はそのまま
+  else v.innerHTML = F.compact(value, 12).html;
   s.append(v);
   return s;
 }
+
+// 角度（度のときは ° を付ける）
+function angleEl(value, angle, fromStep = null) {
+  const s = numEl(value, fromStep);
+  if (angle === 'deg') s.append('°');
+  return s;
+}
+
+const FN_TEXT = {
+  sin: 'sin', cos: 'cos', tan: 'tan', asin: 'sin⁻¹', acos: 'cos⁻¹', atan: 'tan⁻¹', log: 'log', ln: 'ln',
+};
 
 function line(...parts) {
   const p = el('div', 'calc-line');
@@ -61,10 +73,25 @@ function stepLine(s) {
       return line('−（', a, '）= ', r);
     case 'pct+': case 'pct−':
       return line(a, s.op === 'pct+' ? ' + ' : ' − ', a.cloneNode(true), ' の ', numEl(s.b, s.bFrom), '%（', numEl(s.part), '）= ', r);
+    case 'sin': case 'cos': case 'tan':
+      return line(`${s.op} `, angleEl(s.a, s.angle, s.aFrom), ' = ', r);
+    case 'asin': case 'acos': case 'atan':
+      return line(`${FN_TEXT[s.op]} `, a, ' = ', angleEl(s.result, s.angle));
+    case 'log': case 'ln':
+      return line(`${s.op} `, a, ' = ', r);
+    case '!':
+      return line(a, '! = ', r);
+    case 'C': case 'P':
+      return line(a, s.op, numEl(s.b, s.bFrom), ' = ', r);
+    case '⁻¹':
+      return line('1 ÷ ', a, ' = ', r);
     default:
       return line(r);
   }
 }
+
+// 階乗の短い書き方（5!）
+const factText = (x) => `${F.compact(x).text}!`;
 
 // 逆算の行
 function reverseLine(rev) {
@@ -86,12 +113,44 @@ function reverseLine(rev) {
       body = k === '2' ? ['√', x, ' = ', v] : [x, ` の ${k} 乗根 = `, v];
       break;
     }
+    case 'asin': case 'acos': case 'atan':
+      body = [`${FN_TEXT[rev.op]} `, x, ' = ', angleEl(rev.value, rev.angle)];
+      break;
+    case 'sin': case 'cos': case 'tan':
+      body = [`${rev.op} `, angleEl(rev.x, rev.angle), ' = ', v];
+      break;
+    case 'pow10':
+      body = ['10 ^ ', x, ' = ', v]; break;
+    case 'exp':
+      body = ['e ^ ', x, ' = ', v]; break;
+    case 'fact':
+      body = [x, ' ÷ ', numEl(rev.y), ' = ', v, rev.ok ? ` ＝ ${factText(rev.k)}` : ` ≠ ${factText(rev.k)}`];
+      break;
+    case 'C': {
+      const npr = `${F.compact(rev.n).text}P${F.compact(rev.r).text}`;
+      body = [x, ` × ${factText(rev.r)} = `, v, rev.ok ? ` ＝ ${npr}` : ` ≠ ${npr}`];
+      break;
+    }
+    case 'P':
+      body = [x, ` × ${factText(rev.rest)} = `, v, rev.ok ? ` ＝ ${factText(rev.n)}` : ` ≠ ${factText(rev.n)}`];
+      break;
+    case 'P÷': {
+      const npr = `${F.compact(rev.n1).text}P${F.compact(rev.r1).text}`;
+      body = [x, ' ÷ ', numEl(rev.n), ' = ', v, rev.ok ? ` ＝ ${npr}` : ` ≠ ${npr}`];
+      break;
+    }
     default:
       body = [v];
   }
   const p = line('逆算：', ...body);
   p.classList.add('rev');
   p.append(el('span', rev.ok ? 'mark ok' : 'mark ng', rev.ok ? ' ✓' : ' ✗'));
+  // sin⁻¹ などは決まった範囲の角度を出すので、もとの角度とちがうことがある
+  if (rev.ok && rev.same === false) {
+    const deg = rev.angle === 'deg' ? '°' : '';
+    p.append(el('span', 'rev-note',
+      `（${F.compact(rev.expect, 12).text}${deg} と ${F.compact(rev.value, 12).text}${deg} は ${rev.fn} が同じ値）`));
+  }
   return p;
 }
 
@@ -102,8 +161,8 @@ function section(title, ...children) {
 }
 
 // 「✓ 検算」の画面
-// onVerify：照合をはじめるとき呼ぶ
-export function openCheck({ items, value, name = '', onVerify }) {
+// onVerify：照合をはじめるとき呼ぶ。angle：三角関数の角度のモード（＝ を押したときのもの）
+export function openCheck({ items, value, name = '', angle = S.getAngle(), onVerify }) {
   const body = $('#checkBody');
   body.replaceChildren();
   $('#checkTitle').textContent = name ? `「${name}」の検算` : '検算';
@@ -119,10 +178,12 @@ export function openCheck({ items, value, name = '', onVerify }) {
   // C：計算の順番と逆算
   let steps = [];
   try {
-    steps = evaluate(items).steps;
+    steps = evaluate(items, { angle }).steps;
   } catch {
     steps = [];
   }
+  const trig = steps.some((s) => TRIG.includes(s.op));
+  if (trig) body.append(el('p', 'hint', `角度は「${S.ANGLE_NAME[angle]}」で計算しています。`));
   if (steps.length === 0) {
     body.append(section('逆算で確かめる', el('p', 'hint', '数が1つだけで、計算がないので、逆算するものはありません。')));
   } else {
@@ -149,6 +210,12 @@ export function openCheck({ items, value, name = '', onVerify }) {
     ];
     if (steps.length > MAX_STEPS) hints.push(el('p', 'hint', `計算が多いので、はじめの ${MAX_STEPS} 個を出しています。`));
     if (anyApprox) hints.push(el('p', 'hint', '√ などの割り切れない計算は、50桁より下の四捨五入のちがいを無視してくらべています。'));
+    if (trig) {
+      const range = angle === 'deg'
+        ? 'sin⁻¹ と tan⁻¹ は −90°〜90°、cos⁻¹ は 0°〜180°'
+        : 'sin⁻¹ と tan⁻¹ は −π/2〜π/2、cos⁻¹ は 0〜π';
+      hints.push(el('p', 'hint', `${range} の角度を出します。もとの角度とちがうときは、sin などの値が同じになる角度かで確かめています。`));
+    }
     body.append(section('計算の順番と逆算', summary, list, ...hints));
   }
 
