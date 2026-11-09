@@ -33,8 +33,11 @@ import { initBase, showBase } from './base-ui.js';
 import {
   initComplex, showComplex, useComplexAnswer, editComplex, checkComplex,
 } from './complex-ui.js';
+import {
+  initPhys, showPhys, editPhys, checkPhys,
+} from './phys-ui.js';
 
-const VERSION = 'ステップ11（2026-11-09）';
+const VERSION = 'ステップ12（2026-11-09）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -364,7 +367,7 @@ function equals(button) {
 // ---------------------------------------------------------
 const VIEWS = {
   calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView', unit: '#unitView',
-  calculus: '#calculusView', base: '#baseView', complex: '#complexView',
+  calculus: '#calculusView', base: '#baseView', complex: '#complexView', phys: '#physView',
 };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
@@ -394,7 +397,8 @@ function applyMode() {
   else if (mode === 'unit') showUnit();
   else if (mode === 'calculus') showCalculus();
   else if (mode === 'base') showBase();
-  else showComplex();
+  else if (mode === 'complex') showComplex();
+  else showPhys();
 }
 
 // ---------------------------------------------------------
@@ -635,6 +639,14 @@ function start() {
     onCheckComplex(items, angle) {
       checkComplex(items, angle);
     },
+    // 公式の履歴：式を直す（公式の画面へ）・検算
+    onEditPhys(snap) {
+      editPhys(snap);
+      setMode('phys');
+    },
+    onCheckPhys(snap) {
+      checkPhys(snap);
+    },
   });
   initShop({
     settings: () => settings,
@@ -719,6 +731,19 @@ function start() {
     // 答え（i のない数のときだけ）を電卓の式に入れる
     onUseInCalc(value) {
       useInCalc(value);
+      toast('答えを電卓の式に入れました');
+    },
+  });
+  initPhys({
+    settings: () => settings,
+    active: () => currentMode() === 'phys',
+    // 公式の ＝
+    onSaveHistory(items, value, meta) {
+      addHistory(items, value, meta);
+    },
+    // 公式の答えを電卓の式に入れる
+    onUseInCalc(value, label) {
+      useInCalc(value, label);
       toast('答えを電卓の式に入れました');
     },
   });

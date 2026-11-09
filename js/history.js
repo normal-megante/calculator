@@ -6,6 +6,7 @@
 //   ・「答えを使う」：答えを全部の桁のまま、いまの式に入れる
 //   ・「式を直す」：その式を電卓に戻して、途中を直せる
 //   ・複素数の履歴（mode: 'complex'）は、式も答えも複素数の形で持つ（value ＝ 実部、im ＝ 虚部）
+//   ・公式の履歴（mode: 'phys'）は、公式と打った数（phys）も持つ（式を直す・検算は公式の画面で）
 // =========================================================
 import * as N from './num.js';
 import * as F from './format.js';
@@ -87,7 +88,8 @@ export async function initHistory(h) {
 
 // ＝ を押したとき（お買い物の「履歴に残す」では、種類も付けて）
 //   angle … sin などがある式のときだけ、計算した角度のモード（'deg' / 'rad'）
-export async function addHistory(items, value, { name = '', kind = '', angle = null } = {}) {
+//   phys … 公式の画面の ＝ のとき、公式と打った数
+export async function addHistory(items, value, { name = '', kind = '', angle = null, phys = null } = {}) {
   const entry = {
     id: DB.newId(),
     time: Date.now(),
@@ -97,6 +99,10 @@ export async function addHistory(items, value, { name = '', kind = '', angle = n
     kind,
   };
   if (angle) entry.angle = angle;
+  if (phys) {
+    entry.mode = 'phys';
+    entry.phys = phys;
+  }
   entries.unshift(entry);
   try {
     await store(entry);
@@ -260,6 +266,16 @@ function onListClick(event) {
     else if (act === 'edit') handlers.onEditComplex(c.items, entry.angle);
     else handlers.onCheckComplex(c.items, entry.angle);
     if (act !== 'check') closePanel();
+    return;
+  }
+  // 公式の履歴：式を直す・検算は、公式の画面で
+  if (entry.mode === 'phys' && (act === 'edit' || act === 'check')) {
+    if (act === 'edit') {
+      handlers.onEditPhys(entry.phys);
+      closePanel();
+    } else {
+      handlers.onCheckPhys(entry.phys);
+    }
     return;
   }
   switch (act) {
