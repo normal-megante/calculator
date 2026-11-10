@@ -22,24 +22,9 @@ import { openDetail } from './detail.js';
 import { liveCompare, fullCompare } from './check.js';
 import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
-import { initShop, showShop, currentShopTotal } from './shop-ui.js';
-import { initSplit, showSplit, setSplitTotal } from './split-ui.js';
-import { initTime, showTime } from './time-ui.js';
-import { initDate, showDate } from './date-ui.js';
-import { initUnit, showUnit } from './unit-ui.js';
 import { initSci } from './sci-ui.js';
-import { initCalculus, showCalculus } from './calculus-ui.js';
-import { initBase, showBase } from './base-ui.js';
-import {
-  initComplex, showComplex, useComplexAnswer, editComplex, checkComplex,
-} from './complex-ui.js';
-import {
-  initPhys, showPhys, editPhys, checkPhys,
-} from './phys-ui.js';
-import { initBig, showBig } from './big-ui.js';
-import { initProb, showProb } from './prob-ui.js';
 
-const VERSION = 'ステップ16（2026-11-10）';
+const VERSION = 'ステップ17（2026-11-11）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -408,18 +393,14 @@ function applyMode() {
     if (on) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
   fadeModes();
-  if (mode === 'calc') render();
-  else if (mode === 'shop') showShop();
-  else if (mode === 'split') showSplit();
-  else if (mode === 'time') showTime();
-  else if (mode === 'date') showDate();
-  else if (mode === 'unit') showUnit();
-  else if (mode === 'calculus') showCalculus();
-  else if (mode === 'base') showBase();
-  else if (mode === 'complex') showComplex();
-  else if (mode === 'phys') showPhys();
-  else if (mode === 'big') showBig();
-  else showProb();
+  if (mode === 'calc') {
+    render();
+    return;
+  }
+  // ほかのタブは、はじめて開くときに読み込む（読み込み中に別のタブにしたら、見せない）
+  loadTab(mode).then((m) => {
+    if (m && currentMode() === mode) TABS[mode].show(m);
+  });
 }
 
 // ---------------------------------------------------------
@@ -615,6 +596,242 @@ function currentValue() {
   }
 }
 
+// ---------------------------------------------------------
+// ほかのタブ（お買い物〜確率）
+//   起動を速くするため、はじめて開くときに読み込んで init する（電卓だけは最初から）。
+//   TABS[名前] ＝ { load: 読み込み, init(m): つなぐ, show(m): 見せる }
+// ---------------------------------------------------------
+const TABS = {
+  shop: {
+    load: () => import('./shop-ui.js'),
+    init: (m) => m.initShop({
+      settings: () => settings,
+      active: () => currentMode() === 'shop',
+      // お買い物の「電卓で使う」：合計を電卓の式に入れる
+      onUseTotal(value) {
+        useInCalc(value);
+        toast('合計を電卓の式に入れました');
+      },
+      // お買い物の「履歴に残す」
+      onSaveHistory(items, value, meta) {
+        addHistory(items, value, meta);
+      },
+      // お買い物の「割り勘する」：合計を割り勘の「払う合計」に入れる
+      onSplit(value) {
+        withTab('split', (m) => {
+          if (m.setSplitTotal(value)) {
+            setMode('split');
+            toast('お買い物の合計を、割り勘の「払う合計」に入れました');
+          }
+        });
+      },
+    }),
+    show: (m) => m.showShop(),
+  },
+  split: {
+    load: async () => {
+      await loadTab('shop'); // 割り勘は「お買い物の合計」を使う
+      return import('./split-ui.js');
+    },
+    init: (m) => m.initSplit({
+      settings: () => settings,
+      active: () => currentMode() === 'split',
+      calcAnswer: () => state.last?.value ?? null,
+      shopTotal: () => loadedTab.shop?.currentShopTotal() ?? null,
+    }),
+    show: (m) => m.showSplit(),
+  },
+  time: {
+    load: () => import('./time-ui.js'),
+    init: (m) => m.initTime({
+      settings: () => settings,
+      active: () => currentMode() === 'time',
+      // 時間の ＝・時給の「履歴に残す」
+      onSaveHistory(items, value, meta) {
+        addHistory(items, value, meta);
+      },
+      // 時間の答え・給料を電卓の式に入れる
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+      },
+    }),
+    show: (m) => m.showTime(),
+  },
+  date: {
+    load: () => import('./date-ui.js'),
+    init: (m) => m.initDate({
+      settings: () => settings,
+      active: () => currentMode() === 'date',
+    }),
+    show: (m) => m.showDate(),
+  },
+  unit: {
+    load: () => import('./unit-ui.js'),
+    init: (m) => m.initUnit({
+      settings: () => settings,
+      active: () => currentMode() === 'unit',
+      // 単位の答えを電卓の式に入れる
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+        toast('答えを電卓の式に入れました');
+      },
+    }),
+    show: (m) => m.showUnit(),
+  },
+  calculus: {
+    load: () => import('./calculus-ui.js'),
+    init: (m) => m.initCalculus({
+      settings: () => settings,
+      active: () => currentMode() === 'calculus',
+      // 微積分の答えを電卓の式に入れる
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+        toast('答えを電卓の式に入れました');
+      },
+    }),
+    show: (m) => m.showCalculus(),
+  },
+  base: {
+    load: () => import('./base-ui.js'),
+    init: (m) => m.initBase({
+      settings: () => settings,
+      active: () => currentMode() === 'base',
+      // n進法の ＝
+      onSaveHistory(items, value, meta) {
+        addHistory(items, value, meta);
+      },
+      // n進法の答えを電卓の式に入れる
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+        toast('答えを電卓の式に入れました（10進の数として）');
+      },
+    }),
+    show: (m) => m.showBase(),
+  },
+  complex: {
+    load: () => import('./complex-ui.js'),
+    init: (m) => m.initComplex({
+      settings: () => settings,
+      active: () => currentMode() === 'complex',
+      // 複素数の ＝
+      onSaveHistory(items, z, meta) {
+        addComplexHistory(items, z, meta);
+      },
+      // 答え（i のない数のときだけ）を電卓の式に入れる
+      onUseInCalc(value) {
+        useInCalc(value);
+        toast('答えを電卓の式に入れました');
+      },
+    }),
+    show: (m) => m.showComplex(),
+  },
+  phys: {
+    load: () => import('./phys-ui.js'),
+    init: (m) => m.initPhys({
+      settings: () => settings,
+      active: () => currentMode() === 'phys',
+      // 公式の ＝
+      onSaveHistory(items, value, meta) {
+        addHistory(items, value, meta);
+      },
+      // 公式の答えを電卓の式に入れる
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+        toast('答えを電卓の式に入れました');
+      },
+    }),
+    show: (m) => m.showPhys(),
+  },
+  big: {
+    load: () => import('./big-ui.js'),
+    init: (m) => m.initBig({
+      settings: () => settings,
+      active: () => currentMode() === 'big',
+      // 巨大数の答え（ふつうの数のときだけ）を電卓の式に入れる
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+        toast('答えを電卓の式に入れました');
+      },
+    }),
+    show: (m) => m.showBig(),
+  },
+  prob: {
+    load: () => import('./prob-ui.js'),
+    init: (m) => m.initProb({
+      settings: () => settings,
+      active: () => currentMode() === 'prob',
+      // 確率の答えを電卓の式に入れる（% の答えは 0.5 のような小数で）
+      onUseInCalc(value, label) {
+        useInCalc(value, label);
+        toast('答えを電卓の式に入れました');
+      },
+    }),
+    show: (m) => m.showProb(),
+  },
+};
+const tabLoading = {};  // 名前 → 読み込み中・読み込みずみ（Promise）
+const loadedTab = {};   // 名前 → 読み込みずみのモジュール
+
+function loadTab(name) {
+  tabLoading[name] ??= (async () => {
+    try {
+      const m = await TABS[name].load();
+      TABS[name].init(m);
+      loadedTab[name] = m;
+      return m;
+    } catch (error) {
+      console.error(error);
+      // ※ 読み込みに失敗したファイルは、ブラウザが覚えてしまうので、開きなおすまで読めない
+      delete tabLoading[name];
+      toast('この画面を読み込めませんでした', { label: '開きなおす', run: () => location.reload() });
+      return null;
+    }
+  })();
+  return tabLoading[name];
+}
+
+// タブを読み込んでから何かする
+function withTab(name, fn) {
+  loadTab(name).then((m) => {
+    if (m) fn(m);
+  });
+}
+
+// ---------------------------------------------------------
+// Service Worker（スマホにしまったファイルで、すぐ開く。sw.js）
+//   新しい版は裏で取ってきて、次に開いたときから。開いたままなら「更新する」で。
+//   開発中（localhost）は、しまわないで いつも最新のファイル（?sw を付けると使う）
+// ---------------------------------------------------------
+function setupServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const sw = navigator.serviceWorker;
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if (local && !new URLSearchParams(location.search).has('sw')) {
+    sw.getRegistrations().then((list) => list.forEach((r) => r.unregister())).catch(() => {});
+    return;
+  }
+  const hadController = !!sw.controller; // はじめて入れたときは、更新のお知らせを出さない
+  const offer = (worker) => {
+    if (!hadController || !worker) return;
+    toast('新しい版があります', { label: '更新する', run: () => worker.postMessage('skipWaiting') });
+  };
+  sw.register('sw.js').then((reg) => {
+    if (reg.waiting) offer(reg.waiting);
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      worker?.addEventListener('statechange', () => {
+        if (worker.state === 'installed') offer(worker);
+      });
+    });
+  }).catch(() => {});
+  let reloading = false;
+  sw.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload(); // 新しい版で開きなおす
+  });
+}
+
 function start() {
   S.setAngle(settings.angle === 'rad' ? 'rad' : 'deg');
   loadState();
@@ -650,147 +867,34 @@ function start() {
     },
     // 複素数の履歴：答えを使う・式を直す・検算（複素数の画面で）
     onUseComplex(z, label) {
-      useComplexAnswer(z, label);
-      setMode('complex');
+      withTab('complex', (m) => {
+        m.useComplexAnswer(z, label);
+        setMode('complex');
+      });
     },
     onEditComplex(items, angle) {
-      editComplex(items, angle);
-      setMode('complex');
+      withTab('complex', (m) => {
+        m.editComplex(items, angle);
+        setMode('complex');
+      });
     },
     onCheckComplex(items, angle) {
-      checkComplex(items, angle);
+      withTab('complex', (m) => m.checkComplex(items, angle));
     },
     // 公式の履歴：式を直す（公式の画面へ）・検算
     onEditPhys(snap) {
-      editPhys(snap);
-      setMode('phys');
+      withTab('phys', (m) => {
+        m.editPhys(snap);
+        setMode('phys');
+      });
     },
     onCheckPhys(snap) {
-      checkPhys(snap);
-    },
-  });
-  initShop({
-    settings: () => settings,
-    active: () => currentMode() === 'shop',
-    // お買い物の「電卓で使う」：合計を電卓の式に入れる
-    onUseTotal(value) {
-      useInCalc(value);
-      toast('合計を電卓の式に入れました');
-    },
-    // お買い物の「履歴に残す」
-    onSaveHistory(items, value, meta) {
-      addHistory(items, value, meta);
-    },
-    // お買い物の「割り勘する」：合計を割り勘の「払う合計」に入れる
-    onSplit(value) {
-      if (setSplitTotal(value)) {
-        setMode('split');
-        toast('お買い物の合計を、割り勘の「払う合計」に入れました');
-      }
-    },
-  });
-  initSplit({
-    settings: () => settings,
-    active: () => currentMode() === 'split',
-    calcAnswer: () => state.last?.value ?? null,
-    shopTotal: currentShopTotal,
-  });
-  initTime({
-    settings: () => settings,
-    active: () => currentMode() === 'time',
-    // 時間の ＝・時給の「履歴に残す」
-    onSaveHistory(items, value, meta) {
-      addHistory(items, value, meta);
-    },
-    // 時間の答え・給料を電卓の式に入れる
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-    },
-  });
-  initDate({
-    settings: () => settings,
-    active: () => currentMode() === 'date',
-  });
-  initUnit({
-    settings: () => settings,
-    active: () => currentMode() === 'unit',
-    // 単位の答えを電卓の式に入れる
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-      toast('答えを電卓の式に入れました');
-    },
-  });
-  initCalculus({
-    settings: () => settings,
-    active: () => currentMode() === 'calculus',
-    // 微積分の答えを電卓の式に入れる
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-      toast('答えを電卓の式に入れました');
-    },
-  });
-  initBase({
-    settings: () => settings,
-    active: () => currentMode() === 'base',
-    // n進法の ＝
-    onSaveHistory(items, value, meta) {
-      addHistory(items, value, meta);
-    },
-    // n進法の答えを電卓の式に入れる
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-      toast('答えを電卓の式に入れました（10進の数として）');
-    },
-  });
-  initComplex({
-    settings: () => settings,
-    active: () => currentMode() === 'complex',
-    // 複素数の ＝
-    onSaveHistory(items, z, meta) {
-      addComplexHistory(items, z, meta);
-    },
-    // 答え（i のない数のときだけ）を電卓の式に入れる
-    onUseInCalc(value) {
-      useInCalc(value);
-      toast('答えを電卓の式に入れました');
-    },
-  });
-  initPhys({
-    settings: () => settings,
-    active: () => currentMode() === 'phys',
-    // 公式の ＝
-    onSaveHistory(items, value, meta) {
-      addHistory(items, value, meta);
-    },
-    // 公式の答えを電卓の式に入れる
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-      toast('答えを電卓の式に入れました');
-    },
-  });
-  initBig({
-    settings: () => settings,
-    active: () => currentMode() === 'big',
-    // 巨大数の答え（ふつうの数のときだけ）を電卓の式に入れる
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-      toast('答えを電卓の式に入れました');
-    },
-  });
-  initProb({
-    settings: () => settings,
-    active: () => currentMode() === 'prob',
-    // 確率の答えを電卓の式に入れる（% の答えは 0.5 のような小数で）
-    onUseInCalc(value, label) {
-      useInCalc(value, label);
-      toast('答えを電卓の式に入れました');
+      withTab('phys', (m) => m.checkPhys(snap));
     },
   });
   applyMode();
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  performance.mark('calculator-ready'); // 起動の速さを測るための印
+  setupServiceWorker();
 }
 
 start();

@@ -12,6 +12,22 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/main.js"></script>
+  <!-- 電卓に使うファイルを、いっぺんに読み込みはじめる（1つずつ順番に待たないように。tests/pwa.test.mjs がたしかめる） -->
+  <link rel="modulepreload" href="js/num.js">
+  <link rel="modulepreload" href="js/format.js">
+  <link rel="modulepreload" href="js/sci.js">
+  <link rel="modulepreload" href="js/calc.js">
+  <link rel="modulepreload" href="js/keys.js">
+  <link rel="modulepreload" href="js/ui.js">
+  <link rel="modulepreload" href="js/history.js">
+  <link rel="modulepreload" href="js/db.js">
+  <link rel="modulepreload" href="js/complex.js">
+  <link rel="modulepreload" href="js/detail.js">
+  <link rel="modulepreload" href="js/check.js">
+  <link rel="modulepreload" href="js/check-ui.js">
+  <link rel="modulepreload" href="js/install.js">
+  <link rel="modulepreload" href="js/sci-ui.js">
+  <link rel="modulepreload" href="js/form.js">
 </head>
 <body>
   <div class="app" id="app">

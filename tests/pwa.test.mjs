@@ -42,6 +42,29 @@ test('PRECACHE に書いてあるファイルは、ちゃんと存在する', ()
   assert.deepEqual(notFound, [], `存在しないファイルがあります: ${notFound.join(', ')}`);
 });
 
+// main.js から import でつながっているファイル（import() で後から読むものは入れない）
+function staticGraph(file = 'js/main.js', seen = new Set()) {
+  if (seen.has(file)) return seen;
+  seen.add(file);
+  const source = readFileSync(join(root, file), 'utf8');
+  for (const m of source.matchAll(/^import [^;]*? from '\.\/([^']+)';/gms)) staticGraph(`js/${m[1]}`, seen);
+  return seen;
+}
+
+test('起動のとき読み込むのは電卓の分だけ（ほかのタブは開くときに読み込む）', () => {
+  const graph = [...staticGraph()];
+  const tabs = ['shop', 'split', 'time', 'date', 'unit', 'calculus', 'base', 'complex', 'phys', 'big', 'prob']
+    .map((t) => `js/${t}-ui.js`);
+  assert.deepEqual(graph.filter((f) => tabs.includes(f)), [], 'main.js がタブの画面を import しています（import() にしてください）');
+});
+
+test('index.html の modulepreload は、起動のとき読み込むファイルと同じ', () => {
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  const preload = [...html.matchAll(/<link rel="modulepreload" href="([^"]+)">/g)].map((m) => m[1]).sort();
+  const graph = [...staticGraph()].filter((f) => f !== 'js/main.js').sort();
+  assert.deepEqual(preload, graph);
+});
+
 test('manifest の内容とアイコン', () => {
   const manifest = JSON.parse(readFileSync(join(root, 'manifest.webmanifest'), 'utf8'));
   assert.equal(manifest.display, 'standalone');

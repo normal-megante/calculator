@@ -1,20 +1,23 @@
 // =========================================================
-// サービスワーカー：ネットにつながっていなくても開けるようにするしくみ
+// サービスワーカー：スマホにしまったファイルで、すぐ開くしくみ
 //
-// アプリのファイル（画面の部品）を、スマホの中にしまっておきます。
-//   ・ネットにつながるとき … いつも最新のファイルを取ってくる（取ったら、しまい直す）
-//   ・ネットが遅い／つながらないとき … しまっておいたファイルで開く
-// だから、アプリを更新して公開すると、次に開いたときから新しい版になります。
+// アプリのファイル（画面の部品）を、まとめてスマホの中にしまっておきます。
+//   ・開くとき … ネットを待たずに、しまってあるファイルで開く（速い・ネットがなくても開ける）
+//   ・新しい版 … この sw.js が変わると（下の CACHE の番号を上げると）、ブラウザが裏で
+//                 新しいファイルを全部取ってきて、別の入れ物にしまう。
+//                 アプリを閉じて次に開いたときから新しい版になる。
+//                 開いたままなら、画面に「新しい版があります［更新する］」が出る（main.js）。
+//   ※ 古い版と新しい版のファイルがまざらないように、入れ物は版ごとに分ける。
 //
 // ※ 履歴のデータは、ここではなく IndexedDB（js/db.js）に入っています。
+// ※ アプリを更新して公開するときは、CACHE の番号を1つ上げてください。
 // ※ js などのファイルを新しく足したら、下の PRECACHE にも書き足してください。
-//   （書き忘れても、ネットで1回開けばしまわれます。テストでもチェックしています）
+//   （テストでもチェックしています）
 // =========================================================
 
-const CACHE = 'calculator-v17';   // しまっておく入れ物の名前
-const NETWORK_TIMEOUT = 4000;    // ネットの返事をこれだけ（ミリ秒）待ち、来なければしまってある分を使う
+const CACHE = 'calculator-v18';   // しまっておく入れ物の名前（版ごとに変える）
 
-// 最初にまとめてしまっておくファイル
+// まとめてしまっておくファイル
 const PRECACHE = [
   './',
   'index.html',
@@ -65,14 +68,18 @@ const PRECACHE = [
   'icons/icon-maskable-512.png',
 ];
 
-// ---- はじめて入ったとき：ファイルをまとめてしまう ----
+// ---- 新しい版が来たとき：ファイルを全部取ってきて、新しい入れ物にしまう ----
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    // 1つ取れなくても、ほかはしまえるように1つずつ
-    await Promise.allSettled(PRECACHE.map((path) => cache.add(new Request(path, { cache: 'no-cache' }))));
-    await self.skipWaiting(); // 新しい版のサービスワーカーに、すぐ交代する
+    // 1つでも取れなければ、この版はやめる（古い版のまま。次にまたためす）
+    await cache.addAll(PRECACHE.map((path) => new Request(path, { cache: 'no-cache' })));
   })());
+});
+
+// 開いている画面から「更新する」と言われたら、すぐ交代する
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
 // ---- 交代したとき：古い入れ物を片付ける ----
@@ -86,32 +93,20 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// ---- ファイルを読み込むたびに ----
+// ---- ファイルを読み込むたびに：しまってあれば、それをすぐ返す ----
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   // このアプリのファイルを「見る」ときだけ受け持つ（それ以外はブラウザにおまかせ）
   if (request.method !== 'GET' || !request.url.startsWith(self.registration.scope)) return;
-
-  const key = cacheKey(request.url);
-
-  // ネットから最新を取ってくる。取れたら、次のためにしまい直す。
-  let saving = Promise.resolve();
-  const network = fetch(key, { cache: 'no-cache' }).then((response) => {
-    if (response.ok) saving = saveCopy(key, response.clone());
-    return response;
-  });
-  // 画面に返したあとも、しまう作業を最後までやり切る
-  event.waitUntil(network.then(() => saving, () => {}));
-
   event.respondWith((async () => {
-    // ネットの返事を少しだけ待つ
-    const response = await Promise.race([network, wait(NETWORK_TIMEOUT)]).catch(() => null);
-    if (response?.ok) return response;
-    // 遅い・つながらない・エラーのときは、しまってある分を使う
-    const cached = await findInCache(key, request.mode === 'navigate');
-    if (cached) return cached;
-    // しまってもいなければ、ネットの返事をそのまま待つ
-    return response ?? network;
+    const key = cacheKey(request.url);
+    const cache = await caches.open(CACHE);
+    const found = await findInCache(cache, key, request.mode === 'navigate');
+    if (found) return found;
+    // しまっていなければ、ネットから取って、次のためにしまう
+    const response = await fetch(request);
+    if (response.ok) event.waitUntil(cache.put(key, response.clone()).catch(() => {}));
+    return response;
   })());
 });
 
@@ -121,25 +116,11 @@ function cacheKey(url) {
   return origin + pathname;
 }
 
-async function saveCopy(key, response) {
-  try {
-    const cache = await caches.open(CACHE);
-    await cache.put(key, response);
-  } catch {
-    // 容量がいっぱいなど。しまえなくても、今の表示には困らない
-  }
-}
-
-async function findInCache(key, isPage) {
-  const cache = await caches.open(CACHE);
+async function findInCache(cache, key, isPage) {
   const options = { ignoreVary: true };
   const found = await cache.match(key, options);
   if (found || !isPage) return found;
   // ページそのものなら、トップページ（index.html）で代わりにする
   return (await cache.match(self.registration.scope, options))
     ?? cache.match(`${self.registration.scope}index.html`, options);
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms, null));
 }
