@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import * as N from '../js/num.js';
 import {
   CATS, catByKey, unitOf, baseUnit, convert, convertAll, toBase, fromBase, valueText, plainDecimal, factorText,
+  factorLabel, sameValue, dmsText,
 } from '../js/unit.js';
 
 const d = (t) => N.parseDecimal(t);
@@ -119,4 +120,29 @@ test('表示の形', () => {
   assert.equal(factorText(N.frac(400n, 121n)), '400/121');
   assert.equal(valueText(d('2.9403')).text, '2.9403');
   assert.equal(valueText(N.frac(1n, 3n)).text, '0.333333333333…');
+});
+
+test('角度：度・ラジアン・π rad・回転・分・秒・度分秒', () => {
+  eq(conv('angle', 'pirad', 'deg', '0.5'), d('90'));        // π/2 rad ＝ 90度（ぴったり）
+  eq(conv('angle', 'deg', 'pirad', '45'), d('0.25'));
+  eq(conv('angle', 'deg', 'pirad', '60'), N.frac(1n, 3n));  // 60度 ＝ π/3 rad
+  eq(conv('angle', 'turn', 'amin', '1'), d('21600'));
+  eq(conv('angle', 'grad', 'deg', '100'), d('90'));
+  eq(conv('angle', 'asec', 'amin', '90'), d('1.5'));
+  // rad は π を使うので概数（50桁）
+  const deg = conv('angle', 'rad', 'deg', '1');
+  assert.equal(deg.q, false);
+  assert.equal(valueText(deg, 50).text, '57.295779513082320876798154814105170332405472466564…');
+  assert.equal(valueText(conv('angle', 'deg', 'rad', '180'), 50).text, '3.1415926535897932384626433832795028841971693993751…');
+  assert.ok(sameValue(conv('angle', 'deg', 'rad', conv('angle', 'rad', 'deg', '2')), d('2')));
+  assert.ok(!sameValue(d('1'), d('1.0000001')));
+  assert.equal(factorLabel(catByKey('angle').units.find((u) => u.key === 'rad')), '180/π');
+  // 度分秒
+  assert.equal(dmsText(d('12.5')), '12°30′00″');
+  assert.equal(dmsText(d('0.0125')), '0°00′45″');
+  assert.equal(dmsText(N.neg(d('0.5'))), '−0°30′00″');
+  assert.equal(dmsText(d('359.99999')), '約 359°59′59.96″');
+  assert.equal(dmsText(d('359.999999999')), '約 360°00′00″');   // 四捨五入で繰り上がる
+  assert.equal(dmsText(deg), '約 57°17′44.81″');
+  assert.equal(dmsText(d('1000000000')), null);
 });

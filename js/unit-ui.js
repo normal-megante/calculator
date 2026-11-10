@@ -184,6 +184,11 @@ function renderRows(r) {
     if (r.error) val.textContent = u.key === p.from ? inputText(p) : '—';
     else val.innerHTML = U.valueText(r.all.values.get(u.key)).html;
     b.append(name, val);
+    // 角度の「度」は、度分秒も
+    if (u.dms && !r.error) {
+      const dms = U.dmsText(r.all.values.get(u.key));
+      if (dms) b.append(el('small', 'u-note', `度分秒：${dms}`));
+    }
     if (u.note) b.append(el('small', 'u-note', u.note));
     b.setAttribute('aria-pressed', String(u.key === p.to));
     return b;
@@ -317,15 +322,17 @@ const TEMP_FROM_BASE = {
 
 function toBaseLine(u, x, y, base) {
   if (u.affine) return TEMP_TO_BASE[u.key](x, y);
-  return `${minus(x)} ${u.sym} × ${U.factorText(u.f)} ＝ ${t(y)} ${base.sym}`;
+  return `${minus(x)} ${u.sym} × ${U.factorLabel(u)} ＝ ${t(y)} ${base.sym}`;
 }
 function fromBaseLine(u, y, z, base) {
   if (u.affine) return TEMP_FROM_BASE[u.key](y, z);
-  return `${minus(y)} ${base.sym} ÷ ${U.factorText(u.f)} ＝ ${t(z)} ${u.sym}`;
+  return `${minus(y)} ${base.sym} ÷ ${U.factorLabel(u)} ＝ ${t(z)} ${u.sym}`;
 }
 
-// 「400/121 m²（約3.30578512397 m²）」・「0.0254 m」
-function factorWithUnit(x, sym) {
+// 「400/121 m²（約3.30578512397 m²）」・「0.0254 m」・「180/π 度（約57.2957795131 度）」
+function factorWithUnit(u, sym) {
+  const x = u.f;
+  if (u.ftext) return `${u.ftext} ${sym}（約${t(x).replace(/…$/, '')} ${sym}）`;
   const p = U.plainDecimal(x, { maxInt: 30, maxDecimals: 30 });
   if (p) return `${F.groupNumberText(p.text)} ${sym}`;
   return `${F.fractionForm(x).text} ${sym}（約${t(x).replace(/…$/, '')} ${sym}）`;
@@ -354,15 +361,19 @@ function openUnitCheck() {
   if (from.key === base.key) go.append(line(`${from.sym} が基準の単位なので、そのまま ${t(x)} ${base.sym}`));
   else go.append(line(toBaseLine(from, x, y, base)));
   if (to.key !== base.key) go.append(line(fromBaseLine(to, y, answer, base)));
-  go.append(el('p', 'hint', `${c.name}は ${base.sym} を基準にして、いったん ${base.sym} にしてから変換しています。分数のまま計算するので、途中で誤差は出ません。`));
+  const approx = from.approx || to.approx;
+  go.append(el('p', 'hint', approx
+    ? `${c.name}は ${base.sym} を基準にして、いったん ${base.sym} にしてから変換しています。rad は π（80桁で計算した概数）を使うので、答えは概数です（上から50桁を出しています）。`
+    : `${c.name}は ${base.sym} を基準にして、いったん ${base.sym} にしてから変換しています。分数のまま計算するので、途中で誤差は出ません。`));
   const path = [from, base, to].filter((u, i, list) => i === 0 || u.key !== list[i - 1].key).map((u) => u.sym);
   body.append(section(`1. ${path.join(' → ')}`, go));
 
   // 2. 逆算
   const rev = el('div');
   const back = U.convert(c, to.key, from.key, answer);
-  const ok = N.cmp(back, x) === 0;
-  rev.append(checked(`${t(answer)} ${to.sym} を ${from.sym} にもどすと ${t(back)} ${from.sym}`, ok));
+  const ok = U.sameValue(back, x); // 概数（rad）は上から50桁で比べる
+  const backText = approx && ok ? `${t(x)} ${from.sym}（上から50桁まで同じ）` : `${t(back)} ${from.sym}`;
+  rev.append(checked(`${t(answer)} ${to.sym} を ${from.sym} にもどすと ${backText}`, ok));
   const v = U.valueText(answer);
   if (v.rounded) {
     const s = shownValue(answer);
@@ -376,13 +387,14 @@ function openUnitCheck() {
   for (const u of [from, to]) {
     if (u.key === base.key) continue;
     if (u.affine) defs.append(line(`${u.sym}：${u.def}`));
-    else if (u.def) defs.append(line(`1 ${u.sym} ＝ ${u.def}`), line(`　 ＝ ${factorWithUnit(u.f, base.sym)}`));
-    else defs.append(line(`1 ${u.sym} ＝ ${factorWithUnit(u.f, base.sym)}`));
+    else if (u.def) defs.append(line(`1 ${u.sym} ＝ ${u.def}`), line(`　 ＝ ${factorWithUnit(u, base.sym)}`));
+    else defs.append(line(`1 ${u.sym} ＝ ${factorWithUnit(u, base.sym)}`));
     if (u.note) defs.append(el('p', 'hint', `${u.sym}：${u.note}`));
   }
   if (defs.childElementCount) body.append(section('3. 単位の大きさ', defs));
 
-  body.prepend(el('p', `summary ${ok ? 'ok' : 'ng'}`, ok ? '✓ もとの単位にもどすと、打った数とぴったり同じです' : '✗ 合わない所があります'));
+  const same = approx ? '✓ もとの単位にもどすと、打った数と同じです（概数なので上から50桁で比べています）' : '✓ もとの単位にもどすと、打った数とぴったり同じです';
+  body.prepend(el('p', `summary ${ok ? 'ok' : 'ng'}`, ok ? same : '✗ 合わない所があります'));
   const dialog = $('#checkDialog');
   if (!dialog.open) dialog.showModal();
 }

@@ -26,7 +26,7 @@ import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
 import { initSci } from './sci-ui.js';
 
-const VERSION = 'ステップ18（2026-11-11）';
+const VERSION = 'ステップ19（2026-11-11）';
 const STATE_KEY = 'calculator.state';
 
 const state = {

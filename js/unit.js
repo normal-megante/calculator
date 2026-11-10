@@ -10,14 +10,17 @@
 //   sym  … 画面に出す名前（cm・坪 など）
 //   read … 読み方（漢字の単位だけ）
 //   f    … 基準の単位いくつ分か（'0.0254' や '400/121' のように書く。分数のまま正確に）
+//          '180/π' のように π があるものだけは概数（approx: true。π は80桁で計算、50桁を出す）
 //   def  … その大きさがどこから来たか（検算で見せる）
 //   note … 注意書き（一覧の、その単位のすぐ下に出す）
+//   dms  … 一覧のその単位の下に、度分秒（57°17′44.81″）も出す（角度の「度」）
 // =========================================================
 import * as N from './num.js';
 import * as F from './format.js';
 
-// '0.0254' や '400/121' や '-160/9' → 正確な数
+// '0.0254' や '400/121' や '-160/9' → 正確な数（'180/π' だけは概数）
 function q(text) {
+  if (text.endsWith('/π')) return N.div(q(text.slice(0, -2)), N.pi());
   const neg = text.startsWith('-');
   const [a, b] = (neg ? text.slice(1) : text).split('/');
   const x = b === undefined ? N.parseDecimal(a) : N.div(N.parseDecimal(a), N.parseDecimal(b));
@@ -100,6 +103,19 @@ const RAW = [
     ],
   },
   {
+    key: 'angle', name: '角度', base: '度', from: 'rad', to: 'deg',
+    hint: '180度 ＝ π rad。「π rad」の行は π の何倍か（0.5 π rad ＝ π/2 rad ＝ 90度）',
+    units: [
+      { key: 'deg', sym: '度', f: '1', dms: true },
+      { key: 'rad', sym: 'rad', read: 'ラジアン', f: '180/π', def: '半径と同じ長さの弧の角度（180/π 度）', note: 'π を使うので答えは概数です（上から50桁）。π の何倍かでちょうどの数がほしいときは「π rad」' },
+      { key: 'pirad', sym: 'π rad', read: 'π の何倍', f: '180', def: 'π rad ＝ 180度（半回転）', note: '「π の何倍か」を打ちます（π/2 rad なら 0.5、π/4 rad なら 0.25）' },
+      { key: 'turn', sym: '回転', f: '360', def: '1回転 ＝ 360度' },
+      { key: 'grad', sym: 'グラード', f: '9/10', def: '直角を100に分けた角度（1回転 ＝ 400グラード）', note: '測量で使うことがあります（gon とも）' },
+      { key: 'amin', sym: '分（′）', read: 'かくふん', f: '1/60', def: '1度の60分の1', note: '角度の「分」です（時間の分ではありません）' },
+      { key: 'asec', sym: '秒（″）', read: 'かくびょう', f: '1/3600', def: '1分の60分の1（1度の3600分の1）' },
+    ],
+  },
+  {
     key: 'speed', name: '速さ', base: 'm/s', from: 'kmh', to: 'ms',
     units: [
       { key: 'kmh', sym: 'km/h', read: '時速', f: '5/18', def: '1時間に 1km（1000m ÷ 3600秒）' },
@@ -157,7 +173,7 @@ export const CATS = RAW.map((c) => ({
   ...c,
   units: c.units.map((u) => (u.a !== undefined
     ? { ...u, a: q(u.a), b: q(u.b), affine: true }
-    : { ...u, f: q(u.f) })),
+    : { ...u, f: q(u.f), ...(u.f.includes('π') ? { ftext: u.f, approx: true } : {}) })),
 }));
 
 export const catByKey = (key) => CATS.find((c) => c.key === key) ?? null;
@@ -227,4 +243,52 @@ export function plainDecimal(x, { maxInt = 12, maxDecimals = 8 } = {}) {
 export function factorText(x) {
   const p = plainDecimal(x, { maxInt: 30, maxDecimals: 30 });
   return p ? F.groupNumberText(p.text) : F.fractionForm(x).text;
+}
+
+// 単位の大きさの書き方（rad の「180/π」のように、書いたままのものはそのまま）
+export const factorLabel = (u) => u.ftext ?? factorText(u.f);
+
+// 同じ数か（概数がまざっていたら、上から50桁で比べる）
+export function sameValue(a, b) {
+  if (N.cmp(a, b) === 0) return true;
+  if (a.q && b.q) return false;
+  const ra = N.roundSig(a, N.SHOW);
+  const rb = N.roundSig(b, N.SHOW);
+  return ra.neg === rb.neg && ra.digits === rb.digits && ra.exp === rb.exp;
+}
+
+// 度 → 度分秒（57°17′44.81″）。秒は小数第2位まで（四捨五入したら「約」）。10億度より大きければ null
+const HUNDREDTH_SEC = 360000n; // 1度 ＝ 0.01秒 の 360000 個分
+export function dmsText(deg) {
+  const neg = N.sign(deg) < 0;
+  const a = N.absNum(deg);
+  if (N.cmp(a, N.frac(1000000000n)) >= 0) return null;
+  const h = N.mul(a, N.frac(HUNDREDTH_SEC));
+  let n;
+  let exact;
+  if (h.q) {
+    n = (2n * h.n + h.d) / (2n * h.d); // 四捨五入
+    exact = h.n % h.d === 0n;
+  } else {
+    const e = BigInt(h.e);
+    if (e >= 0n) {
+      n = h.m * 10n ** e;
+      exact = true;
+    } else if (e < -200n) {
+      n = 0n;
+      exact = h.m === 0n;
+    } else {
+      const den = 10n ** -e;
+      n = (2n * h.m + den) / (2n * den);
+      exact = false;
+    }
+  }
+  const d = n / HUNDREDTH_SEC;
+  const rest = n % HUNDREDTH_SEC;
+  const m = (rest / 6000n).toString().padStart(2, '0');
+  const s100 = rest % 6000n;
+  const sec = (s100 / 100n).toString().padStart(2, '0');
+  const dec = (s100 % 100n).toString().padStart(2, '0').replace(/0+$/, '');
+  const sign = neg && n > 0n ? '−' : '';
+  return `${exact ? '' : '約 '}${sign}${F.groupInt(d.toString())}°${m}′${sec}${dec ? `.${dec}` : ''}″`;
 }
