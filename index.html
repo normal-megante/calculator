@@ -42,7 +42,7 @@
         <button type="button" role="tab" data-mode="calculus" aria-selected="false">微積分</button>
         <button type="button" role="tab" data-mode="base" aria-selected="false">n進法</button>
         <button type="button" role="tab" data-mode="complex" aria-selected="false">複素数</button>
-        <button type="button" role="tab" data-mode="phys" aria-selected="false">公式</button>
+        <button type="button" role="tab" data-mode="formula" aria-selected="false">公式集</button>
         <button type="button" role="tab" data-mode="big" aria-selected="false">巨大数</button>
         <button type="button" role="tab" data-mode="prob" aria-selected="false">確率</button>
       </nav>
@@ -55,6 +55,11 @@
 
     <!-- 電卓 -->
     <div class="view" id="calcView">
+    <!-- 公式集でタップした公式（ステップ20。✕ でしまう） -->
+    <div class="fx-pin" id="fxPin" hidden>
+      <div class="fx-pin-body" id="fxPinBody"></div>
+      <button type="button" class="fx-pin-close" id="fxPinClose" aria-label="公式をしまう">✕</button>
+    </div>
     <section class="display" id="display">
       <div class="verify-bar" id="verifyBar" hidden>
         <span><b>照合中</b>　1回目の式を見ないで、同じ計算をもう一度打ってください。ちがう所は赤くなります。</span>
@@ -747,54 +752,15 @@
       </section>
     </div>
 
-    <!-- 物理・電気の公式 -->
-    <div class="view ph" id="physView" hidden>
-      <div class="subtabs u-cats ph-cats" id="phCats" role="tablist" aria-label="公式の種類"></div>
-      <div class="u-chips ph-list" id="phList" role="radiogroup" aria-label="公式"></div>
-      <div class="shop-pane ph-pane">
-        <section class="shop-sum ph-card" aria-label="公式と答え">
-          <div class="sum-top">
-            <span class="sum-label" id="phName"></span>
-            <button type="button" class="check-btn" id="btnPhToCalc">電卓で使う</button>
-            <button type="button" class="check-btn" id="btnPhCheck">✓ 検算</button>
-          </div>
-          <div class="ph-show-row">
-            <div class="ph-show" id="phShow"></div>
-            <div class="ph-target-row">
-              <span class="ph-target-label">求める</span>
-              <div class="seg ph-target" id="phTarget" role="radiogroup" aria-label="求める量"></div>
-            </div>
-          </div>
-          <button type="button" class="u-main ph-answer" id="phAnswer" aria-label="答え（タップでくわしい表示）"></button>
-          <div class="sum-tax ph-sub" id="phSub"></div>
-          <div class="ph-notes" id="phNotes"></div>
-        </section>
+    <!-- 公式集（ステップ20） -->
+    <div class="view fx" id="formulaView" hidden>
+      <div class="subtabs u-cats" id="fxCats" role="tablist" aria-label="公式の種類"></div>
+      <div class="fx-tools">
+        <input type="search" id="fxSearch" placeholder="さがす（例：円、オーム、解の公式）" enterkeyhint="search" autocomplete="off">
+        <p class="fx-hint">公式をタップすると、電卓の上に出したまま計算できます（電卓の ✕ でしまう）。</p>
       </div>
-
-      <section class="entry ph-entry" aria-label="量の数と単位">
-        <div class="ph-fields" id="phFields"></div>
-        <div class="u-chips" id="phUnits" role="radiogroup" aria-label="えらんだ欄の単位"></div>
-        <p class="entry-hint"><span id="phHint"></span></p>
-      </section>
-
-      <section class="shop-keys" id="phKeys" aria-label="公式のキー">
-        <button type="button" data-k="7" class="k num">7</button>
-        <button type="button" data-k="8" class="k num">8</button>
-        <button type="button" data-k="9" class="k num">9</button>
-        <button type="button" data-k="back" class="k fn" aria-label="1文字消す">⌫</button>
-        <button type="button" data-k="4" class="k num">4</button>
-        <button type="button" data-k="5" class="k num">5</button>
-        <button type="button" data-k="6" class="k num">6</button>
-        <button type="button" data-k="clear" class="k fn danger" aria-label="この欄の数を消す">C</button>
-        <button type="button" data-k="1" class="k num">1</button>
-        <button type="button" data-k="2" class="k num">2</button>
-        <button type="button" data-k="3" class="k num">3</button>
-        <button type="button" data-k="neg" class="k op" aria-label="プラスとマイナスを切りかえる">±</button>
-        <button type="button" data-k="0" class="k num">0</button>
-        <button type="button" data-k="." class="k num">.</button>
-        <button type="button" data-k="next" class="k fn small" aria-label="次の欄へ">次へ</button>
-        <button type="button" data-k="=" class="k eq" aria-label="履歴に残す">=</button>
-      </section>
+      <div class="fx-list" id="fxList"></div>
+      <p class="empty" id="fxEmpty" hidden>見つかりませんでした。</p>
     </div>
 
     <!-- 巨大数 -->
@@ -1208,13 +1174,11 @@
         <li>√・ln・分数乗は答えがいくつかあるので、角度が −180° より大きく 180° までの「主値」を出します（(−8)^(1/3) は −2 ではなく 1＋1.73…i）。</li>
         <li>「✓ 検算」は、(a＋bi)(c＋di) を分けてかけて i² ＝ −1 にする計算 → 逆算 → 極形式（長さと角度）でも同じになるか、の順に見せます。</li>
       </ul>
-      <h3>物理・電気の公式</h3>
+      <h3>公式集</h3>
       <ul>
-        <li>上の「公式」で、種類（電気・力と運動・エネルギー・熱・波）と公式をえらびます。オームの法則・電力・電気代・電池・合成抵抗・速さ・等加速度運動・力・重さ・圧力・密度・仕事・エネルギー・熱量・波など。</li>
-        <li>「求める」で、公式のどの量を出すかをえらびます（V ＝ I × R なら V・I・R のどれでも）。ほかの量の欄をタップして数を打つと、＝ を押さなくても答えが出ます（＝ で履歴に残ります）。</li>
-        <li>単位は、えらんだ欄の下のボタンで変えられます（mA・kΩ・km/h など）。計算の前に、公式の単位（A・Ω・m/s など）に分数のまま直すので、誤差は出ません。</li>
-        <li>重力加速度 g（9.8）・水の比熱（4.2）・電気の単価（31円/kWh）などは、はじめから入っています。ちがう数にしたいときは打ちかえます。</li>
-        <li>「✓ 検算」は、公式を求める形に変形 → 単位をそろえる → 数を入れて計算 → 答えを元の公式に入れて、左と右が同じになるか（逆算）、の順に見せます。</li>
+        <li>上の「公式集」で、図形・立体・三平方と三角比・式と方程式・指数と対数と数列・場合の数と確率・割合と速さ・力と運動・仕事とエネルギーと熱・電気・波の公式を見られます。「さがす」で名前や言葉（円、オーム など）からもさがせます。</li>
+        <li>公式をタップすると、電卓の上にその公式を出したまま計算できます。✕ でしまいます。</li>
+        <li>前の「公式」の計算で残した履歴は、答えだけ使えます。</li>
       </ul>
       <h3>巨大数</h3>
       <ul>

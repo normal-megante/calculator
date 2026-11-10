@@ -26,7 +26,7 @@ import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
 import { initSci } from './sci-ui.js';
 
-const VERSION = 'ステップ19（2026-11-11）';
+const VERSION = 'ステップ20（2026-11-11）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -561,7 +561,7 @@ function equals(button) {
 // ---------------------------------------------------------
 const VIEWS = {
   calc: '#calcView', shop: '#shopView', split: '#splitView', time: '#timeView', date: '#dateView', unit: '#unitView',
-  calculus: '#calculusView', base: '#baseView', complex: '#complexView', phys: '#physView', big: '#bigView', prob: '#probView',
+  calculus: '#calculusView', base: '#baseView', complex: '#complexView', formula: '#formulaView', big: '#bigView', prob: '#probView',
 };
 const currentMode = () => (VIEWS[settings.mode] ? settings.mode : 'calc');
 
@@ -931,22 +931,16 @@ const TABS = {
     }),
     show: (m) => m.showComplex(),
   },
-  phys: {
-    load: () => import('./phys-ui.js'),
-    init: (m) => m.initPhys({
-      settings: () => settings,
-      active: () => currentMode() === 'phys',
-      // 公式の ＝
-      onSaveHistory(items, value, meta) {
-        addHistory(items, value, meta);
-      },
-      // 公式の答えを電卓の式に入れる
-      onUseInCalc(value, label) {
-        useInCalc(value, label);
-        toast('答えを電卓の式に入れました');
+  formula: {
+    load: () => import('./formulas-ui.js'),
+    init: (m) => m.initFormulas({
+      pinned: () => settings.pin ?? null,
+      // 公式をタップ：電卓の上に出して、電卓へ
+      onPin(name) {
+        pinFormula(name);
       },
     }),
-    show: (m) => m.showPhys(),
+    show: (m) => m.showFormulas(),
   },
   big: {
     load: () => import('./big-ui.js'),
@@ -1038,6 +1032,62 @@ function setupServiceWorker() {
   });
 }
 
+// ---------------------------------------------------------
+// 公式集の公式を、電卓の上に出しておく（ステップ20。✕ でしまう）
+//   出している公式の名前は設定の pin。公式のデータ（formulas.js）は、出すときだけ読み込む
+// ---------------------------------------------------------
+function pinFormula(name) {
+  settings = { ...settings, pin: name };
+  saveSettings(settings);
+  setMode('calc');
+  showPin();
+  toast('公式を電卓の上に出しました（✕ でしまう）');
+}
+
+async function showPin() {
+  const box = $('#fxPin');
+  const name = settings.pin;
+  if (!name) {
+    box.hidden = true;
+    return;
+  }
+  let f = null;
+  try {
+    f = (await import('./formulas.js')).formulaById(name);
+  } catch {
+    f = null; // 読み込めなければ出さない（次に開いたとき）
+  }
+  if (settings.pin !== name) return; // 読み込み中に変わった
+  if (!f) {
+    box.hidden = true;
+    return;
+  }
+  const head = document.createElement('div');
+  head.className = 'fx-pin-name';
+  head.textContent = f.name;
+  const formula = document.createElement('div');
+  formula.className = 'fx-f';
+  formula.innerHTML = f.f; // formulas.js の中で書いた HTML だけ
+  const vars = document.createElement('p');
+  vars.className = 'fx-v';
+  vars.textContent = f.v;
+  $('#fxPinBody').replaceChildren(head, formula, vars);
+  box.hidden = false;
+  if (currentMode() === 'calc') render(); // 表示がせまくなったので、式の大きさを合わせ直す
+}
+
+function setupPin() {
+  $('#fxPinClose').addEventListener('click', () => {
+    settings = { ...settings, pin: null };
+    saveSettings(settings);
+    $('#fxPin').hidden = true;
+    if (currentMode() === 'calc') render();
+  });
+  showPin();
+  // ステップ20 で「公式」の計算をやめたので、その保存も片付ける
+  try { localStorage.removeItem('calculator.phys'); } catch { /* 消せなくても困らない */ }
+}
+
 function start() {
   S.setAngle(settings.angle === 'rad' ? 'rad' : 'deg');
   loadState();
@@ -1046,6 +1096,7 @@ function start() {
   setupDisplay();
   setupEditTools();
   setupMenu();
+  setupPin();
   initSci({
     settings: () => settings,
     saveSetting(patch) {
@@ -1087,16 +1138,6 @@ function start() {
     },
     onCheckComplex(items, angle) {
       withTab('complex', (m) => m.checkComplex(items, angle));
-    },
-    // 公式の履歴：式を直す（公式の画面へ）・検算
-    onEditPhys(snap) {
-      withTab('phys', (m) => {
-        m.editPhys(snap);
-        setMode('phys');
-      });
-    },
-    onCheckPhys(snap) {
-      withTab('phys', (m) => m.checkPhys(snap));
     },
   });
   applyMode();

@@ -15,7 +15,7 @@
 //   （テストでもチェックしています）
 // =========================================================
 
-const CACHE = 'calculator-v20';   // しまっておく入れ物の名前（版ごとに変える）
+const CACHE = 'calculator-v21';   // しまっておく入れ物の名前（版ごとに変える）
 
 // まとめてしまっておくファイル
 const PRECACHE = [
@@ -56,8 +56,8 @@ const PRECACHE = [
   'js/base-ui.js',
   'js/complex.js',
   'js/complex-ui.js',
-  'js/phys.js',
-  'js/phys-ui.js',
+  'js/formulas.js',
+  'js/formulas-ui.js',
   'js/big.js',
   'js/big-ui.js',
   'js/prob.js',

@@ -53,7 +53,7 @@ function staticGraph(file = 'js/main.js', seen = new Set()) {
 
 test('起動のとき読み込むのは電卓の分だけ（ほかのタブは開くときに読み込む）', () => {
   const graph = [...staticGraph()];
-  const tabs = ['shop', 'split', 'time', 'date', 'unit', 'calculus', 'base', 'complex', 'phys', 'big', 'prob']
+  const tabs = ['shop', 'split', 'time', 'date', 'unit', 'calculus', 'base', 'complex', 'formulas', 'big', 'prob']
     .map((t) => `js/${t}-ui.js`);
   assert.deepEqual(graph.filter((f) => tabs.includes(f)), [], 'main.js がタブの画面を import しています（import() にしてください）');
 });
