@@ -11,7 +11,9 @@
 import * as N from './num.js';
 import * as F from './format.js';
 import * as S from './sci.js';
-import { evaluate, preview, isDigit, isFnToken, closeParens, usesAngle } from './calc.js';
+import {
+  evaluate, preview, isDigit, isFnToken, closeParens, usesAngle, doubleDotMarks, textToItems, itemsToCopyText,
+} from './calc.js';
 import { pressKey, insertRef } from './keys.js';
 import {
   $, renderItems, span, caretFromPoint, serializeItems, deserializeItems,
@@ -24,7 +26,7 @@ import { openCheck, openVerifyResult } from './check-ui.js';
 import { setupInstall, installState, promptInstall } from './install.js';
 import { initSci } from './sci-ui.js';
 
-const VERSION = 'ステップ17（2026-11-11）';
+const VERSION = 'ステップ18（2026-11-11）';
 const STATE_KEY = 'calculator.state';
 
 const state = {
@@ -123,7 +125,8 @@ function fitForms(forms, maxPx, minPx) {
   return last;
 }
 
-// 式の文字の大きさ：1行に入る大きさ（入らなければ小さめで折り返す）
+// 式の文字の大きさ：1行に入る大きさ（入らなければ小さめで折り返す。
+// 設定が「横1行」なら折り返さず、横にスワイプで動かす）
 function fitExpression(maxPx, minPx) {
   exprEl.style.whiteSpace = 'nowrap';
   let px = maxPx;
@@ -132,7 +135,7 @@ function fitExpression(maxPx, minPx) {
     if (exprEl.scrollWidth <= exprEl.clientWidth + 1) break;
   }
   exprEl.style.fontSize = `${px}px`;
-  exprEl.style.whiteSpace = '';
+  if (!settings.oneLine) exprEl.style.whiteSpace = '';
 }
 
 // 関数の短い説明（その関数を使ったときだけ、答えの下に出す）
@@ -190,6 +193,7 @@ function setNotes(lines) {
 function render() {
   const done = state.mode === 'done';
   displayEl.classList.toggle('done', done);
+  displayEl.classList.toggle('one-line', !!settings.oneLine);
   $('#verifyBar').hidden = !state.verify;
   $('#btnCheck').hidden = !done;
   shownValue = null;
@@ -198,6 +202,7 @@ function render() {
     const eq = span('eq-sign', ' =');
     renderItems(exprEl, state.last.items, { tail: eq });
     fitExpression(24, 16);
+    if (settings.oneLine) $('#exprWrap').scrollLeft = $('#exprWrap').scrollWidth; // 横1行なら「=」の所を見せる
     const form = fitForms(answerForms(state.last.value), 52, 22);
     shownValue = state.last.value;
     setNotes(noteLines(state.last.notes, form, state.last.value));
@@ -214,6 +219,9 @@ function render() {
         marks = live.marks;
       }
     }
+    // 小数点が2つある数は赤く（直すまで答えは出さない）
+    const dots = doubleDotMarks(state.items);
+    if (dots.size) marks = new Set([...(marks ?? []), ...dots]);
     if (state.items.length === 0) {
       renderItems(exprEl, [], { tail: null });
       exprEl.prepend(span('placeholder', '0'));
@@ -227,6 +235,11 @@ function render() {
       resultEl.classList.add('error');
       resultEl.style.fontSize = '';
       resultEl.textContent = state.error;
+      setNotes(withVerify([]));
+    } else if (dots.size) {
+      resultEl.classList.add('error');
+      resultEl.style.fontSize = '';
+      resultEl.textContent = '小数点が2つある数があります（赤い数を直すと答えが出ます）';
       setNotes(withVerify([]));
     } else {
       const p = preview(state.items);
@@ -248,7 +261,178 @@ function render() {
     // カーソルが見えるようにスクロール
     exprEl.querySelector('.caret')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
+  trackUndo();
   saveState();
+}
+
+// ---------------------------------------------------------
+// 元に戻す・やり直し（↶ ↷、Ctrl+Z / Ctrl+Y。ステップ18）
+//   式が変わるたびに（render のとき）、前の形を積んでおく。カーソルだけ動いたときは積まない。
+//   ＝ や AC も戻せる。アプリを閉じると消える（開いている間だけ）。照合をはじめたら消す（1回目の式が見えないように）。
+// ---------------------------------------------------------
+const undo = { past: [], future: [], at: null };
+const UNDO_MAX = 200;
+
+const snapshot = () => ({ items: state.items, caret: state.caret, mode: state.mode, last: state.last });
+
+function sameContent(a, b) {
+  return a.mode === b.mode && a.last === b.last && a.items.length === b.items.length
+    && a.items.every((t, i) => t === b.items[i]);
+}
+
+function trackUndo() {
+  const now = snapshot();
+  if (undo.at && !sameContent(undo.at, now)) {
+    undo.past.push(undo.at);
+    if (undo.past.length > UNDO_MAX) undo.past.shift();
+    undo.future = [];
+  }
+  undo.at = now;
+  $('#btnUndo').disabled = undo.past.length === 0;
+  $('#btnRedo').disabled = undo.future.length === 0;
+}
+
+// dir：−1 で元に戻す、+1 でやり直す
+function stepUndo(dir, button = null) {
+  const from = dir < 0 ? undo.past : undo.future;
+  const to = dir < 0 ? undo.future : undo.past;
+  if (from.length === 0) {
+    reject(button);
+    return;
+  }
+  to.push(undo.at);
+  const back = from.pop();
+  Object.assign(state, { items: back.items, caret: back.caret, mode: back.mode, last: back.last, error: '' });
+  undo.at = back; // 戻した形は、積みなおさない
+  render();
+}
+
+function clearUndo() {
+  undo.past = [];
+  undo.future = [];
+  trackUndo();
+}
+
+// ---------------------------------------------------------
+// 式のコピー・貼り付け（ステップ18）
+// ---------------------------------------------------------
+
+// コピーする文字：打っている式（＝ のあとは「式 = 答え」）
+function copyText() {
+  if (state.mode === 'done') {
+    const answer = F.compact(state.last.value, 16);
+    return `${itemsToCopyText(state.last.items, F.pasteText)} = ${answer.text}${answer.rounded ? '…' : ''}`;
+  }
+  return itemsToCopyText(state.items, F.pasteText);
+}
+
+const shortText = (text) => (text.length > 28 ? `${text.slice(0, 27)}…` : text);
+
+async function writeClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // だめなら、古いやり方でためす
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+  document.body.append(area);
+  area.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  area.remove();
+  return ok;
+}
+
+async function copyExpression() {
+  const text = copyText();
+  if (!text) {
+    toast('コピーする式がありません');
+    return;
+  }
+  toast(await writeClipboard(text) ? `コピーしました：${shortText(text)}` : 'コピーできませんでした');
+}
+
+// 文字を読んで、式のカーソルのところに入れる。読めなければ、その理由を返す
+function pasteIntoExpression(text) {
+  let items;
+  try {
+    items = textToItems(text);
+  } catch (error) {
+    if (!(error instanceof N.CalcError)) throw error;
+    return error.message;
+  }
+  if (state.mode === 'done') startEditing([]); // ＝ のあとなら新しい式
+  const merged = [...state.items.slice(0, state.caret), ...items, ...state.items.slice(state.caret)];
+  startEditing(merged, state.caret + items.length);
+  setMode('calc');
+  toast('貼り付けました（↶ で元に戻せます）');
+  return null;
+}
+
+function openPasteDialog(text, problem) {
+  $('#pasteInput').value = text;
+  $('#pasteError').textContent = problem ?? '';
+  $('#pasteError').hidden = !problem;
+  $('#pasteDialog').showModal();
+}
+
+// 「貼り付け」：コピーした文字を読む（読ませてもらえなければ、貼り付ける欄を出す）
+async function pasteButton() {
+  let text = '';
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    text = '';
+  }
+  if (!text) {
+    openPasteDialog('', null);
+    return;
+  }
+  const problem = pasteIntoExpression(text);
+  if (problem) openPasteDialog(text, problem);
+}
+
+// 電卓のキーボード操作（PC）を受けてよいとき
+function calcKeysActive(event) {
+  if (currentMode() !== 'calc') return false;
+  if (document.querySelector('dialog[open]') || !$('#historyPanel').hidden) return false;
+  return !event.target.closest?.('input, textarea');
+}
+
+function setupEditTools() {
+  $('#btnUndo').addEventListener('click', (event) => stepUndo(-1, event.currentTarget));
+  $('#btnRedo').addEventListener('click', (event) => stepUndo(1, event.currentTarget));
+  $('#btnCopy').addEventListener('click', copyExpression);
+  $('#btnPaste').addEventListener('click', pasteButton);
+  $('#pasteForm').addEventListener('submit', (event) => {
+    const problem = pasteIntoExpression($('#pasteInput').value);
+    if (problem) {
+      event.preventDefault();
+      $('#pasteError').textContent = problem;
+      $('#pasteError').hidden = false;
+    }
+  });
+  // PC：Ctrl+C（文字を選んでいなければ式を）・Ctrl+V
+  document.addEventListener('copy', (event) => {
+    if (!calcKeysActive(event) || String(window.getSelection?.() ?? '') !== '') return;
+    const text = copyText();
+    if (!text || !event.clipboardData) return;
+    event.clipboardData.setData('text/plain', text);
+    event.preventDefault();
+    toast(`コピーしました：${shortText(text)}`);
+  });
+  document.addEventListener('paste', (event) => {
+    if (!calcKeysActive(event)) return;
+    const text = event.clipboardData?.getData('text/plain');
+    if (!text) return;
+    event.preventDefault();
+    const problem = pasteIntoExpression(text);
+    if (problem) openPasteDialog(text, problem);
+  });
 }
 
 // ---------------------------------------------------------
@@ -313,7 +497,7 @@ function handleKey(key, button) {
     return;
   }
 
-  const next = pressKey(state, key);
+  const next = pressKey(state, key, { multiDot: true });
   if (!next) {
     reject(button);
     return;
@@ -328,6 +512,12 @@ function equals(button) {
   if (state.mode === 'done') return;
   if (state.items.length === 0) {
     reject(button);
+    return;
+  }
+  if (doubleDotMarks(state.items).size) {
+    state.error = '小数点が2つある数があります。赤い数を直してください';
+    reject(button);
+    render();
     return;
   }
   try {
@@ -414,6 +604,7 @@ function startVerify(first) {
   state.verify = { items: [...first.items], value: first.value };
   startEditing([]);
   render();
+  clearUndo(); // ↶ で1回目の式が見えないように
   toast('同じ計算を、もう一度打ってください');
 }
 
@@ -475,10 +666,17 @@ function setupKeypad() {
     '^': '^', '(': '(', ')': ')', '%': '%', '.': '.', '!': '!', ',': ',', '#': '#',
   };
   document.addEventListener('keydown', (event) => {
-    if (currentMode() !== 'calc') return;
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (document.querySelector('dialog[open]') || !$('#historyPanel').hidden) return;
-    if (event.target.closest?.('input, textarea')) return;
+    if (!calcKeysActive(event)) return;
+    if (event.ctrlKey || event.metaKey) {
+      // Ctrl+Z で元に戻す、Ctrl+Y（Ctrl+Shift+Z）でやり直す
+      const k = event.key.toLowerCase();
+      if (!event.altKey && (k === 'z' || k === 'y')) {
+        event.preventDefault();
+        stepUndo(k === 'y' || event.shiftKey ? 1 : -1);
+      }
+      return;
+    }
+    if (event.altKey) return;
     const key = /^[0-9]$/.test(event.key) ? event.key : KEYMAP[event.key];
     if (!key) return;
     event.preventDefault();
@@ -552,6 +750,14 @@ function setupMenu() {
     settings = { ...settings, vibrate: vibrate.checked };
     saveSettings(settings);
     buzz(settings, 20);
+  });
+
+  const oneLine = $('#setOneLine');
+  oneLine.checked = !!settings.oneLine;
+  oneLine.addEventListener('change', () => {
+    settings = { ...settings, oneLine: oneLine.checked };
+    saveSettings(settings);
+    if (currentMode() === 'calc') render();
   });
 
   $('#btnInstall').addEventListener('click', async () => {
@@ -838,6 +1044,7 @@ function start() {
   setupInstall();
   setupKeypad();
   setupDisplay();
+  setupEditTools();
   setupMenu();
   initSci({
     settings: () => settings,

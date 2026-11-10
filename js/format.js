@@ -162,6 +162,24 @@ function plainOf(text) {
   return text.replace(/,/g, '').replace(/…$/, '').replace(MINUS, '-').replace('×10^', 'e');
 }
 
+// 式に貼り付けられる数の書き方（コピー用。ステップ18）
+//   整数・割り切れる小数はそのまま、割り切れない分数は 1÷3 のように（ぴったりのまま）、
+//   √2 などの概数は上から50桁（大きい・小さい数は 1.2×10^-30 の形）
+export function pasteText(x) {
+  if (x.q) {
+    const neg = x.n < 0n;
+    const n = neg ? -x.n : x.n;
+    const sign = neg ? MINUS : '';
+    if (x.d === 1n) return sign + n.toString();
+    const full = fullDigits(x);
+    if (full.kind === 'finite' && !full.note) return full.text.replace(/,/g, '');
+    if (N.bitLen(n) + N.bitLen(x.d) <= 3400) return `${sign}${n}÷${x.d}`;
+  }
+  const r = N.roundSig(x, N.SHOW);
+  const f = r.exp > -20 && r.exp <= 60 ? fixedForm(r, true) : sciForm(r, true);
+  return f.text.replace(/,/g, '');
+}
+
 // 指数の形（50桁まで）
 export function scientific(x) {
   const r = N.roundSig(x, N.SHOW);

@@ -2,7 +2,7 @@
 // 画面の小道具（式の表示・お知らせ・振動など、いくつかの画面で使うもの）
 // =========================================================
 import * as N from './num.js';
-import { isDigit, isRef, isVar, openParens, isFnToken } from './calc.js';
+import { isDigit, isRef, isVar, openParens, isFnToken, tokenText } from './calc.js';
 
 export const $ = (selector) => document.querySelector(selector);
 
@@ -20,9 +20,8 @@ function classOf(t) {
   return 'tk';
 }
 
-// 部品の画面での書き方（asin( は sin⁻¹( と書く）
-const SHOW_AS = { 'asin(': 'sin⁻¹(', 'acos(': 'cos⁻¹(', 'atan(': 'tan⁻¹(', 'root(': 'ⁿ√(', 'hf(': 'H(' };
-export const tokenText = (t) => SHOW_AS[t] ?? t;
+// 部品の画面での書き方（asin( は sin⁻¹( と書く。calc.js の tokenText）
+export { tokenText };
 
 // 式（部品の並び）を container の中に表示する。
 // caret が数なら、その位置にカーソルを出す。数字には3桁ごとにカンマを入れる。

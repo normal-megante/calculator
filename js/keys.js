@@ -7,6 +7,8 @@
 // カーソルは式の途中にも置けるので、途中の数字を消したり足したりできる。
 // ステップ14：「!」のすぐ後ろの「!」は「!!」（二重階乗）にする。
 //             「,」は log( ⁿ√( gcd( lcm( の中で、数のすぐ後ろだけ。
+// ステップ18：options.multiDot なら、1つの数に2つ目の小数点も打てる（電卓。直す途中のため）。
+//             その数は赤くなり、直すまで答えは出ない（main.js）。「..」と続けては打てない。
 // =========================================================
 import { isDigit, isRef, isVar, openParens, BINARY_OPS, isFnToken, isOpen } from './calc.js';
 
@@ -55,7 +57,7 @@ function replaceBefore(state, n, parts) {
   return { items, caret: state.caret - n + parts.length };
 }
 
-export function pressKey(state, key) {
+export function pressKey(state, key, { multiDot = false } = {}) {
   const { items, caret } = state;
   const prev = items[caret - 1];
   const prev2 = items[caret - 2];
@@ -80,7 +82,10 @@ export function pressKey(state, key) {
     }
     case '.': {
       const run = numberRunAround(items, caret);
-      if (items.slice(run.start, run.end).includes('.')) return null; // 小数点は1つの数に1つだけ
+      if (items.slice(run.start, run.end).includes('.')) {
+        // 小数点は1つの数に1つだけ（multiDot なら2つ目も。ただし「..」と続けては打てない）
+        if (!multiDot || prev === '.' || items[caret] === '.') return null;
+      }
       if (!isDigit(prev)) return insert(state, ['0', '.']);
       return insert(state, ['.']);
     }

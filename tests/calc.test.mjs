@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as N from '../js/num.js';
-import { evaluate, preview } from '../js/calc.js';
+import { evaluate, preview, doubleDotMarks, textToItems, itemsToCopyText } from '../js/calc.js';
 import { pressKey, insertRef } from '../js/keys.js';
 import * as F from '../js/format.js';
 
@@ -107,6 +107,17 @@ test('キー：数字と小数点', () => {
   assert.equal(text(type(['1', '00'])), '100');
   assert.equal(text(type(['00'])), '0');
   assert.equal(pressKey({ items: ['0'], caret: 1 }, '0'), null);
+});
+
+test('キー：電卓では小数点の2つ目も打てる（赤くして、答えは出さない）', () => {
+  const multi = (keys, start = { items: [], caret: 0 }) => keys.reduce((st, k) => pressKey(st, k, { multiDot: true }) ?? st, start);
+  assert.equal(text(multi(['1', '.', '2', '.', '3'])), '1.2.3');
+  assert.equal(text(multi(['1', '.', '.'])), '1.');                       // 「..」と続けては打てない
+  assert.equal(pressKey({ items: items('1.5'), caret: 1 }, '.', { multiDot: true }), null); // 「.」のすぐ前も
+  assert.deepEqual([...doubleDotMarks(items('2+1.2.3×4'))], [2, 3, 4, 5, 6]);
+  assert.equal(doubleDotMarks(items('1.5+2.25')).size, 0);
+  assert.equal(preview(items('1.2.3+1')), null);
+  assert.throws(() => evaluate(items('1.2.3')), /小数点が2つ/);
 });
 
 test('キー：演算子の置きかえ', () => {
@@ -287,4 +298,79 @@ test('キー：ステップ14の部品', () => {
   assert.equal(pressKey({ items: ['gcd(', '4', ','], caret: 3 }, '×'), null);   // 「,」のすぐ後に × は入らない
   assert.deepEqual(press(['7', 'mod', '3']).items, ['7', 'mod', '3']);
   assert.deepEqual(press(['7', '×', 'mod']).items, ['7', 'mod']);               // 演算子の置きかえ
+});
+
+// ---- 式のコピー・貼り付け（ステップ18） ----
+const val = (list) => F.compact(evaluate(list, { angle: 'deg' }).value, 30).text;
+
+test('貼り付け：いろいろな書き方を読む', () => {
+  const t = (str) => textToItems(str).join('');
+  assert.equal(t('12×(3+4)'), '12×(3+4)');
+  assert.equal(t('12*(3+4) - 5/2'), '12×(3+4)−5÷2');
+  assert.equal(t('１２＋３４'), '12+34');              // 全角
+  assert.equal(t('1,234,567+1'), '1234567+1');         // 3桁ごとのカンマは飛ばす
+  assert.equal(t('gcd(12,18)'), 'gcd(12,18)');          // 区切りの「,」はそのまま
+  assert.equal(t('gcd(1,234, 6)'), 'gcd(1,234,6)');     // gcd( の中のカンマは区切り
+  assert.equal(t('12×7 = 84'), '12×7');                 // 「=」の左
+  assert.equal(t('= 84'), '84');
+  assert.equal(t('0.333…'), '0.333');
+  assert.equal(t('2^10'), '2^10');
+  assert.equal(t('2**10'), '2^10');
+  assert.equal(t('10³'), '10^3');
+  assert.equal(t('5²'), '5²');
+  assert.equal(t('2⁻²'), '2^(−2)');
+  assert.equal(t('1.5E3'), '1.5×10^3');
+  assert.equal(t('1E-5'), '1×10^(−5)');
+  assert.equal(t('SIN(30)+cos(60)'), 'sin(30)+cos(60)');
+  assert.equal(t('sin⁻¹(0.5)'), 'asin(0.5)');
+  assert.equal(t('arctan(1)'), 'atan(1)');
+  assert.equal(t('ⁿ√(3, 8)'), 'root(3,8)');
+  assert.equal(t('H(3)+Γ(5)'), 'hf(3)+Γ(5)');
+  assert.equal(t('pi×2'), 'π×2');
+  assert.equal(t('exp(1)'), 'e^(1)');
+  assert.equal(t('7 mod 3'), '7mod3');
+  assert.equal(t('5!!+5C2+3x4'), '5!!+5C2+3×4');
+  assert.equal(t('200−10%'), '200−10%');
+  assert.throws(() => textToItems('sin30'), /\( をつけて/);
+  assert.throws(() => textToItems('12+abc'), /読めない文字/);
+  assert.throws(() => textToItems('〔答え〕+1'), /答え/);
+  assert.throws(() => textToItems('   '), /ありません/);
+});
+
+test('コピーした式を貼り付けると、同じ式にもどる', () => {
+  const cases = [
+    items('12×(3+4)'), items('1.5+2.25÷3'), items('−2²'), items('200+10%'),
+    ['sin(', '3', '0', ')', '+', 'asin(', '1', ')'], ['root(', '3', ',', '8', ')'], ['gcd(', '1', '2', ',', '1', '8', ')'],
+    ['hf(', '3', ')', '+', 'Γ(', '5', ')', '+', '5', '!!', '+', '7', '#'], ['1', '0', '⁻¹', '+', '2', 'mod', '3'],
+    ['π', '+', 'e', '+', '5', 'C', '2', '+', '5', 'P', '2'], ['2', '^', '(', '1', '+', '2', ')'],
+  ];
+  for (const list of cases) {
+    assert.deepEqual(textToItems(itemsToCopyText(list, F.pasteText)), list, itemsToCopyText(list, F.pasteText));
+  }
+});
+
+test('コピー：答えの部品は数で（割り切れなければ 1÷3 のまま、ぴったり）', () => {
+  const third = { ref: N.div(N.frac(1n), N.frac(3n)), label: '答え' };
+  const neg = { ref: N.frac(-7n), label: '−7' };
+  const quarter = { ref: N.div(N.frac(1n), N.frac(4n)), label: '0.25' };
+  assert.equal(F.pasteText(third.ref), '1÷3');
+  assert.equal(F.pasteText(neg.ref), '−7');
+  assert.equal(F.pasteText(quarter.ref), '0.25');
+  assert.equal(itemsToCopyText([third], F.pasteText), '1÷3');               // 1つだけなら ( ) はいらない
+  assert.equal(itemsToCopyText([third, '×', '3'], F.pasteText), '(1÷3)×3');
+  assert.equal(itemsToCopyText(['2', neg], F.pasteText), '2(−7)');           // くっつく数とは分ける
+  assert.equal(itemsToCopyText(['5', '+', quarter], F.pasteText), '5+0.25');
+  assert.equal(itemsToCopyText(['2', quarter], F.pasteText), '2(0.25)');
+  // 貼り付けると同じ答え（1÷3×3 ＝ ぴったり 1）
+  assert.equal(val(textToItems(itemsToCopyText([third, '×', '3'], F.pasteText))), '1');
+  assert.equal(val(textToItems(itemsToCopyText(['2', neg], F.pasteText))), '−14');
+  // √2 などの概数は50桁
+  const root2 = evaluate(items('√2')).value;
+  const text2 = F.pasteText(root2);
+  assert.match(text2, /^1\.4142135623730950488016887242096980785696718753769$/);
+  const big = evaluate(['1', '0', '^', '1', '0', '0', '÷', '3']).value;
+  assert.equal(F.pasteText(big), `1${'0'.repeat(100)}÷3`);
+  const tiny = evaluate(['√', '2', '÷', '1', '0', '^', '3', '0']).value;
+  assert.match(F.pasteText(tiny), /^1\.41421356\d+×10\^−30$/);
+  assert.equal(val(textToItems(F.pasteText(tiny))), F.compact(tiny, 30).text);
 });

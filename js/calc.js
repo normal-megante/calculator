@@ -543,7 +543,163 @@ export function preview(items, { angle = S.getAngle() } = {}) {
   }
 }
 
-// 式を文字にする（履歴の検索・コピー用）
+// 式を文字にする（履歴の検索用）
 export function itemsToText(items) {
   return items.map((t) => (isRef(t) ? `〔${t.label}〕` : t)).join('');
+}
+
+// 小数点が2つ以上ある数（1.2.3）の部品の位置。電卓では打てるが、直すまで答えは出さない（ステップ18）
+export function doubleDotMarks(items) {
+  const marks = new Set();
+  for (let i = 0; i < items.length;) {
+    if (!isDigit(items[i]) && items[i] !== '.') {
+      i++;
+      continue;
+    }
+    let end = i;
+    let dots = 0;
+    for (; end < items.length && (isDigit(items[end]) || items[end] === '.'); end++) {
+      if (items[end] === '.') dots++;
+    }
+    if (dots > 1) for (let k = i; k < end; k++) marks.add(k);
+    i = end;
+  }
+  return marks;
+}
+
+// ---------------------------------------------------------
+// 式のコピー・貼り付け（ステップ18）
+// ---------------------------------------------------------
+
+// 部品の画面での書き方（asin( は sin⁻¹( と書く）
+const SHOW_AS = { 'asin(': 'sin⁻¹(', 'acos(': 'cos⁻¹(', 'atan(': 'tan⁻¹(', 'root(': 'ⁿ√(', 'hf(': 'H(' };
+export const tokenText = (t) => SHOW_AS[t] ?? t;
+
+// 式 → コピーする文字（12×(3+4) のように。貼り付けると同じ式にもどる）
+//   refText(数) … 答えの部品を、数の書き方にする（format.js の pasteText）
+export function itemsToCopyText(items, refText) {
+  const touches = (t) => t !== undefined && (isDigit(t) || t === '.' || isRef(t) || t === 'π' || t === 'e');
+  return items.map((t, i) => {
+    if (isRef(t)) {
+      const text = refText(t.ref);
+      // まわりとくっつくと別の数になるときや、− ÷ などがあるときは ( ) でかこむ
+      const wrap = items.length > 1 && (/[−÷×^]/.test(text) || touches(items[i - 1]) || touches(items[i + 1]));
+      return wrap ? `(${text})` : text;
+    }
+    if (t === ',') return ', ';
+    if (t === 'mod') return ' mod ';
+    return tokenText(t);
+  }).join('');
+}
+
+// 貼り付けで読む言葉（長いものから。大文字・小文字は区別しない）
+const PASTE_WORDS = [
+  ['sin⁻¹(', ['asin(']], ['cos⁻¹(', ['acos(']], ['tan⁻¹(', ['atan(']],
+  ['arcsin(', ['asin(']], ['arccos(', ['acos(']], ['arctan(', ['atan(']],
+  ['asin(', ['asin(']], ['acos(', ['acos(']], ['atan(', ['atan(']],
+  ['sinh(', ['sinh(']], ['cosh(', ['cosh(']], ['tanh(', ['tanh(']],
+  ['sin(', ['sin(']], ['cos(', ['cos(']], ['tan(', ['tan(']],
+  ['log(', ['log(']], ['ln(', ['ln(']], ['abs(', ['abs(']], ['gamma(', ['Γ(']], ['γ(', ['Γ(']],
+  ['sf(', ['sf(']], ['hf(', ['hf(']], ['root(', ['root(']], ['ⁿ√(', ['root(']],
+  ['gcd(', ['gcd(']], ['lcm(', ['lcm(']], ['exp(', ['e', '^', '(']],
+  ['mod', ['mod']], ['pi', ['π']], ['**', ['^']], ['!!', ['!!']], ['⁻¹', ['⁻¹']],
+];
+// 1文字ずつ読む記号
+const PASTE_CHARS = {
+  '.': '.', '+': '+', '−': '−', '-': '−', 'ー': '−', '‐': '−', '–': '−', '—': '−', '―': '−',
+  '×': '×', '*': '×', '✕': '×', '✖': '×', 'x': '×', 'X': '×', '·': '×', '⋅': '×',
+  '÷': '÷', '/': '÷', '∕': '÷', '^': '^', '(': '(', ')': ')', '%': '%', '√': '√',
+  'π': 'π', 'e': 'e', 'C': 'C', 'P': 'P', '!': '!', '#': '#', '²': '²', ',': ',', '、': ',',
+};
+const SUPER_DIGITS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const COMMA_FNS = ['log(', 'root(', 'gcd(', 'lcm('];
+
+// 全角の英数字・記号 → 半角
+function halfWidth(text) {
+  return text.replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+}
+
+// 貼り付けた文字 → 式の部品の並び。読めなければ CalcError（何が読めないか）を投げる
+//   ・空白・3桁ごとのカンマ（1,234）・「…」は飛ばす
+//   ・「=」があれば、その左の式（左がなければ右）
+//   ・* / - や全角の数字、sin⁻¹( ⁿ√( H( などの画面の書き方、1.5E3（＝1.5×10^3）も読む
+export function textToItems(text) {
+  let s = halfWidth(String(text)).replace(/[\s\u00A0\u3000]+/g, '').replace(/…/g, '');
+  if (s.includes('=')) {
+    const sides = s.split('=');
+    s = sides[0] || sides[1] || '';
+  }
+  if (s.length > 200000) throw new CalcError('長すぎて貼り付けられません', 'syntax');
+  const lower = s.toLowerCase();
+  const items = [];
+  const opens = []; // 開いている ( や関数（「,」が区切りか、3桁ごとのカンマかを決める）
+  const push = (...parts) => {
+    for (const p of parts) {
+      items.push(p);
+      if (isOpen(p)) opens.push(p);
+      else if (p === ')') opens.pop();
+    }
+  };
+  let i = 0;
+  scan: while (i < s.length) {
+    for (const [word, parts] of PASTE_WORDS) {
+      if (lower.startsWith(word, i)) {
+        push(...parts);
+        i += word.length;
+        continue scan;
+      }
+    }
+    const ch = s[i];
+    if (ch === 'H' && s[i + 1] === '(') {
+      push('hf(');
+      i += 2;
+      continue;
+    }
+    const fn = /^(?:(?:arc)?(?:sin|cos|tan)h?|log|ln|abs|gamma|sf|hf|root|gcd|lcm|exp)/.exec(lower.slice(i, i + 8));
+    if (fn) throw new CalcError(`「${s.slice(i, i + fn[0].length)}」の後ろには ( をつけてください（例：sin(30)）`, 'syntax');
+    if (isDigit(ch)) {
+      push(ch);
+      i++;
+      continue;
+    }
+    if (ch === ',' || ch === '、') {
+      // 3桁ごとのカンマ（1,234）は飛ばす。log( などの中で数を区切る「,」はそのまま
+      const thousands = isDigit(items[items.length - 1]) && /^.\d{3}(?!\d)/.test(s.slice(i, i + 5))
+        && !COMMA_FNS.includes(opens[opens.length - 1]);
+      if (!thousands) push(',');
+      i++;
+      continue;
+    }
+    // 1.5E3 ＝ 1.5×10^3
+    if (ch === 'E') {
+      const m = /^E([+\-−]?)(\d+)/.exec(s.slice(i));
+      const prev = items[items.length - 1];
+      if (m && (isDigit(prev) || prev === '.')) {
+        const digits = [...m[2]];
+        push('×', '1', '0', '^', ...(m[1] === '-' || m[1] === '−' ? ['(', '−', ...digits, ')'] : digits));
+        i += m[0].length;
+        continue;
+      }
+    }
+    // 右上の小さい数字：² はそのまま、ほかは ^（10³ ＝ 10^3、2⁻² ＝ 2^(−2)）
+    if (SUPER_DIGITS.includes(ch) || (ch === '⁻' && SUPER_DIGITS.includes(s[i + 1] ?? ''))) {
+      const minus = ch === '⁻';
+      let j = minus ? i + 1 : i;
+      let digits = '';
+      while (j < s.length && SUPER_DIGITS.includes(s[j])) digits += SUPER_DIGITS.indexOf(s[j++]);
+      if (!minus && digits === '2') push('²');
+      else push('^', ...(minus ? ['(', '−', ...digits, ')'] : [...digits]));
+      i = j;
+      continue;
+    }
+    if (PASTE_CHARS[ch]) {
+      push(PASTE_CHARS[ch]);
+      i++;
+      continue;
+    }
+    if (ch === '〔' || ch === '[') throw new CalcError('〔 〕の「答え」の部品は貼り付けられません（数で書いてください）', 'syntax');
+    throw new CalcError(`読めない文字があります：「${String.fromCodePoint(s.codePointAt(i))}」`, 'syntax');
+  }
+  if (items.length === 0) throw new CalcError('貼り付ける式がありません', 'syntax');
+  return items;
 }

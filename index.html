@@ -60,6 +60,13 @@
         <span><b>照合中</b>　1回目の式を見ないで、同じ計算をもう一度打ってください。ちがう所は赤くなります。</span>
         <button type="button" class="ghost" id="btnVerifyStop">やめる</button>
       </div>
+      <!-- 元に戻す・やり直し・式のコピー・貼り付け（ステップ18） -->
+      <div class="edit-tools">
+        <button type="button" class="tool" id="btnUndo" disabled aria-label="元に戻す（Ctrl+Z）" title="元に戻す（Ctrl+Z）">↶</button>
+        <button type="button" class="tool" id="btnRedo" disabled aria-label="やり直し（Ctrl+Y）" title="やり直し（Ctrl+Y）">↷</button>
+        <button type="button" class="tool word" id="btnCopy" title="式をコピー（Ctrl+C）">コピー</button>
+        <button type="button" class="tool word" id="btnPaste" title="式を貼り付け（Ctrl+V）">貼り付け</button>
+      </div>
       <div class="expr-wrap" id="exprWrap">
         <div class="expr" id="expr" aria-label="式（タップした所にカーソルを置けます）"></div>
       </div>
@@ -1070,6 +1077,26 @@
     </form>
   </dialog>
 
+  <!-- 式を貼り付ける（ステップ18。コピーした文字を読ませてもらえないときや、読めなかったとき） -->
+  <dialog class="sheet" id="pasteDialog" aria-labelledby="pasteTitle">
+    <form method="dialog" id="pasteForm">
+      <div class="sheet-head">
+        <h2 id="pasteTitle">式を貼り付ける</h2>
+        <button type="button" class="bar-btn icon" data-close aria-label="閉じる">✕</button>
+      </div>
+      <label class="field">
+        <span>式</span>
+        <textarea id="pasteInput" rows="3" placeholder="ここを長押し →「貼り付け」" autocomplete="off" spellcheck="false"></textarea>
+      </label>
+      <p class="hint error-text" id="pasteError" hidden></p>
+      <p class="hint">12×(3+4)、1,234＋5%、sin(30)、2^10 のような式を読めます（* / - や全角の数字も）。「=」があれば、その左の式を入れます。〔答え〕の部品は数で書いてください。</p>
+      <div class="sheet-actions">
+        <button type="button" class="ghost" data-close>やめる</button>
+        <button type="submit" class="primary">式に入れる</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- この電卓について -->
   <dialog class="sheet" id="aboutDialog" aria-labelledby="aboutTitle">
     <div class="sheet-head">
@@ -1219,6 +1246,10 @@
     <label class="menu-item" role="menuitemcheckbox">
       <input type="checkbox" id="setVibrate">
       <span>キーを押したときに震える<small>（対応しているスマホだけ）</small></span>
+    </label>
+    <label class="menu-item" role="menuitemcheckbox">
+      <input type="checkbox" id="setOneLine">
+      <span>式を横1行で出す<small>（長い式は横にスワイプ。オフなら下に折り返す）</small></span>
     </label>
     <button type="button" class="menu-item" role="menuitem" id="btnInstall">ホーム画面に追加</button>
     <button type="button" class="menu-item" role="menuitem" id="btnAbout">この電卓について</button>
