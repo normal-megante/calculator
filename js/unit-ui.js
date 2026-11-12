@@ -166,8 +166,8 @@ function renderCard(r) {
   main.disabled = false;
   // 見たい単位の 1 は、打った単位でいくつか
   const one = U.convert(c, to.key, from.key, N.ONE);
-  $('#unitSub').textContent = to.affine
-    ? `${inputText(p)} ${from.sym} は ${v.text} ${to.sym}`
+  $('#unitSub').textContent = to.affine || to.inv || from.inv
+    ?`${inputText(p)} ${from.sym} は ${v.text} ${to.sym}`
     : `${inputText(p)} ${from.sym} ＝ ${v.text} ${to.sym}（1${to.sym} ＝ ${U.valueText(one).text} ${from.sym}）`;
 }
 
@@ -322,10 +322,12 @@ const TEMP_FROM_BASE = {
 
 function toBaseLine(u, x, y, base) {
   if (u.affine) return TEMP_TO_BASE[u.key](x, y);
+  if (u.inv) return `${u.invText} ÷ ${minus(x)} ${u.sym} ＝ ${t(y)} ${base.sym}`;
   return `${minus(x)} ${u.sym} × ${U.factorLabel(u)} ＝ ${t(y)} ${base.sym}`;
 }
 function fromBaseLine(u, y, z, base) {
   if (u.affine) return TEMP_FROM_BASE[u.key](y, z);
+  if (u.inv) return `${u.invText} ÷ ${minus(y)} ${base.sym} ＝ ${t(z)} ${u.sym}`;
   return `${minus(y)} ${base.sym} ÷ ${U.factorLabel(u)} ＝ ${t(z)} ${u.sym}`;
 }
 
@@ -363,7 +365,7 @@ function openUnitCheck() {
   if (to.key !== base.key) go.append(line(fromBaseLine(to, y, answer, base)));
   const approx = from.approx || to.approx;
   go.append(el('p', 'hint', approx
-    ? `${c.name}は ${base.sym} を基準にして、いったん ${base.sym} にしてから変換しています。rad は π（80桁で計算した概数）を使うので、答えは概数です（上から50桁を出しています）。`
+    ? `${c.name}は ${base.sym} を基準にして、いったん ${base.sym} にしてから変換しています。${[from, to].filter((u) => u.approx).map((u) => u.sym).join('・')} は π（80桁で計算した概数）を使うので、答えは概数です（上から50桁を出しています）。`
     : `${c.name}は ${base.sym} を基準にして、いったん ${base.sym} にしてから変換しています。分数のまま計算するので、途中で誤差は出ません。`));
   const path = [from, base, to].filter((u, i, list) => i === 0 || u.key !== list[i - 1].key).map((u) => u.sym);
   body.append(section(`1. ${path.join(' → ')}`, go));
@@ -386,7 +388,7 @@ function openUnitCheck() {
   const defs = el('div');
   for (const u of [from, to]) {
     if (u.key === base.key) continue;
-    if (u.affine) defs.append(line(`${u.sym}：${u.def}`));
+    if (u.affine || u.inv) defs.append(line(`${u.sym}：${u.def}`));
     else if (u.def) defs.append(line(`1 ${u.sym} ＝ ${u.def}`), line(`　 ＝ ${factorWithUnit(u, base.sym)}`));
     else defs.append(line(`1 ${u.sym} ＝ ${factorWithUnit(u, base.sym)}`));
     if (u.note) defs.append(el('p', 'hint', `${u.sym}：${u.note}`));

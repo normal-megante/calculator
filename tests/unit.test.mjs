@@ -18,8 +18,52 @@ test('種類と単位のそろい方', () => {
     assert.equal(new Set(keys).size, keys.length, `${c.name} の key が重なっている`);
     assert.ok(baseUnit(c), `${c.name} の基準の単位`);
     assert.ok(unitOf(c, c.from) && unitOf(c, c.to) && c.from !== c.to, `${c.name} の最初の単位`);
-    for (const u of c.units) assert.ok(u.affine || N.sign(u.f) > 0, `${u.sym} の大きさ`);
+    for (const u of c.units) assert.ok(u.affine || N.sign(u.inv ?? u.f) > 0, `${u.sym} の大きさ`);
   }
+});
+
+test('天文の長さ・小さい長さ・磁場', () => {
+  eq(conv('len', 'au', 'km', '1'), d('149597870.7'));
+  eq(conv('len', 'ly', 'km', '1'), d('9460730472580.8'));
+  eq(conv('len', 'ly', 'au', '1'), N.div(d('9460730472580800'), d('149597870700')));
+  assert.equal(valueText(conv('len', 'pc', 'ly', '1')).text, '3.26156377717…');
+  assert.equal(valueText(conv('len', 'pc', 'au', '1')).text, '206,264.806247…');
+  eq(conv('len', 'nm', 'um', '1000'), N.ONE);
+  eq(conv('len', 'um', 'mm', '1000'), N.ONE);
+  eq(conv('mag', 'T', 'G', '1'), d('10000'));
+  eq(conv('mag', 'mT', 'G', '1'), d('10'));
+  eq(conv('mag', 'uT', 'nT', '1'), d('1000'));
+});
+
+test('時間・力・仕事率・周波数・電気量・密度・放射線', () => {
+  eq(conv('time', 'day', 's', '1'), d('86400'));
+  eq(conv('time', 'year', 'day', '1'), d('365'));
+  eq(conv('time', 's', 'day', '1000000'), N.div(d('1000000'), d('86400')));
+  eq(conv('force', 'kgf', 'N', '1'), d('9.80665'));
+  eq(conv('force', 'N', 'dyn', '1'), d('100000'));
+  eq(conv('power', 'PS', 'W', '100'), d('73549.875'));
+  eq(conv('power', 'kcalh', 'W', '3600'), d('4184'));
+  assert.equal(valueText(conv('power', 'HP', 'PS', '1')).text, '1.01386966542…');
+  eq(conv('freq', 'rpm', 'Hz', '3000'), d('50'));
+  eq(conv('freq', 'GHz', 'MHz', '2.4'), d('2400'));
+  eq(conv('charge', 'mAh', 'C', '1000'), d('3600'));
+  eq(conv('charge', 'C', 'e', '1.602176634'), N.frac(N.pow10(19)));
+  eq(conv('density', 'gcm3', 'kgm3', '1'), d('1000'));
+  eq(conv('dose', 'mSv', 'uSv', '1'), d('1000'));
+  eq(conv('dose', 'rem', 'mSv', '1'), d('10'));
+  eq(conv('activity', 'Ci', 'GBq', '1'), d('37'));
+});
+
+test('燃費（L/100km は割り算で変換）', () => {
+  eq(conv('fuel', 'kmL', 'l100', '20'), d('5'));
+  eq(conv('fuel', 'l100', 'kmL', '5'), d('20'));
+  eq(conv('fuel', 'l100', 'l100', '7.3'), d('7.3'));
+  assert.equal(valueText(conv('fuel', 'kmL', 'mpg', '10')).text, '23.5214583333…');
+  assert.equal(valueText(conv('fuel', 'mpg', 'l100', '30')).text, '7.84048611111…');
+  const fuel = catByKey('fuel');
+  assert.ok(convertAll(fuel, 'kmL', N.ZERO).error);
+  assert.ok(convertAll(fuel, 'l100', d('-1')).error);
+  assert.ok(!convertAll(fuel, 'l100', d('5')).error);
 });
 
 test('長さ・重さ', () => {

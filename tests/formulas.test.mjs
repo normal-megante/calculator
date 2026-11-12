@@ -46,6 +46,9 @@ test('さがす', () => {
   assert.ok(names('ピタゴラス').includes('三平方の定理'));    // 検索用の言葉
   assert.ok(names('ＲＩ').includes('オームの法則'));            // 全角の英字も半角に
   assert.ok(names('ｖ ＝ fλ').includes('波の速さ'));           // 全角の英字も半角に
-  assert.deepEqual(names('電気 並列'), ['合成抵抗']);           // 言葉は全部ふくむもの
+  assert.deepEqual(names('電気 並列'), ['合成抵抗', '合成容量']); // 言葉は全部ふくむもの
+  assert.deepEqual(names('抵抗 並列 どの'), ['合成抵抗']);
+  assert.ok(names('テスラ').includes('磁束密度と磁束'));
+  assert.ok(names('電磁波').includes('電磁波の速さ'));
   assert.deepEqual(names('ぜんぜんない'), []);
 });
